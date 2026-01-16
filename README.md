@@ -35,6 +35,27 @@
 sbatch --export=MODEL=cnn,OPTIMIZER=full_gd,LR=0.005,LMAX_DECAY=1 train_eoss.slurm
 ```
 
+### Custom Grid (Loop Spec)
+
+```bash
+# Dry run (default)
+./launch_ablation.sh --custom \
+  --models "mlp cnn" \
+  --optimizers "sgd adam" \
+  --lrs "0.001 0.005" \
+  --batches "8 32" \
+  --lmax-decay "0 1"
+
+# Submit
+./launch_ablation.sh --custom \
+  --models "mlp cnn" \
+  --optimizers "sgd adam" \
+  --lrs "0.001 0.005" \
+  --batches "8 32" \
+  --lmax-decay "0 1" \
+  --run
+```
+
 ---
 
 ## Before vs After

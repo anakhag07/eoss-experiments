@@ -3,17 +3,32 @@
 # ABLATION EXPERIMENT LAUNCHER
 # =============================================================================
 # Usage:
-#   ./launch_ablation.sh                    # Dry run (shows what would be submitted)
-#   ./launch_ablation.sh --run              # Actually submit jobs
-#   ./launch_ablation.sh --preset full_gd   # Run full-GD preset
-#   ./launch_ablation.sh --preset sgd       # Run SGD preset
-#   ./launch_ablation.sh --preset all       # Run all presets
+#   ./launch_ablation.sh                          # Dry run (shows what would be submitted)
+#   ./launch_ablation.sh --run                    # Actually submit jobs
+#   ./launch_ablation.sh --preset full_gd         # Run full-GD preset
+#   ./launch_ablation.sh --preset sgd             # Run SGD preset
+#   ./launch_ablation.sh --preset all             # Run all presets
+#   ./launch_ablation.sh --custom --models "mlp cnn" --optimizers "sgd adam" \
+#     --lrs "0.001 0.005" --batches "8 32" --run   # Custom grid
 # =============================================================================
 
 set -e
 
 DRY_RUN=true
 PRESET="full_gd"
+CUSTOM=false
+USE_PROTOTYPES=true
+
+MODELS=""
+OPTIMIZERS=""
+LRS=""
+BATCHES=""
+LMAX_DECAYS=""
+NUM_DATA=""
+STEPS=""
+DATASET=""
+LOSS=""
+CLASSES=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -26,9 +41,59 @@ while [[ $# -gt 0 ]]; do
       PRESET="$2"
       shift 2
       ;;
+    --custom)
+      CUSTOM=true
+      PRESET="custom"
+      shift
+      ;;
+    --models)
+      MODELS="$2"
+      shift 2
+      ;;
+    --optimizers)
+      OPTIMIZERS="$2"
+      shift 2
+      ;;
+    --lrs)
+      LRS="$2"
+      shift 2
+      ;;
+    --batches)
+      BATCHES="$2"
+      shift 2
+      ;;
+    --lmax-decay)
+      LMAX_DECAYS="$2"
+      shift 2
+      ;;
+    --num-data)
+      NUM_DATA="$2"
+      shift 2
+      ;;
+    --steps)
+      STEPS="$2"
+      shift 2
+      ;;
+    --dataset)
+      DATASET="$2"
+      shift 2
+      ;;
+    --loss)
+      LOSS="$2"
+      shift 2
+      ;;
+    --classes)
+      CLASSES="$2"
+      shift 2
+      ;;
+    --no-prototypes)
+      USE_PROTOTYPES=false
+      shift
+      ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 [--run] [--preset full_gd|sgd|adam|all]"
+      echo "Usage: $0 [--run] [--preset full_gd|sgd|adam|momentum|all]"
+      echo "       $0 --custom --models \"...\" --optimizers \"...\" --lrs \"...\" [--batches \"...\"] [--lmax-decay \"...\"]"
       exit 1
       ;;
   esac
@@ -46,8 +111,12 @@ submit_job() {
   local LR=$3
   local BATCH=$4
   local LMAX_DECAY=${5:-0}
+  local EXTRA_EXPORTS=${6:-}
   
-  local PROTO="${PROTOTYPES[$MODEL]}"
+  local PROTO=""
+  if $USE_PROTOTYPES; then
+    PROTO="${PROTOTYPES[$MODEL]}"
+  fi
   local JOB_NAME="${MODEL}-${OPTIMIZER}-lr${LR}"
   
   if [[ "$LMAX_DECAY" == "1" ]]; then
@@ -55,6 +124,9 @@ submit_job() {
   fi
   
   local EXPORT_VARS="MODEL=${MODEL},OPTIMIZER=${OPTIMIZER},LR=${LR},BATCH=${BATCH},LMAX_DECAY=${LMAX_DECAY}"
+  if [[ -n "$EXTRA_EXPORTS" ]]; then
+    EXPORT_VARS="${EXPORT_VARS},${EXTRA_EXPORTS}"
+  fi
   if [[ -n "$PROTO" ]]; then
     EXPORT_VARS="${EXPORT_VARS},TRACK_FEATURE_PROTOTYPES_FROM=${PROTO}"
   fi
@@ -110,6 +182,54 @@ run_momentum_preset() {
 }
 
 # =============================================================================
+# CUSTOM GRID
+# =============================================================================
+
+run_custom_grid() {
+  echo "=== Custom Grid ==="
+
+  local MODELS_LIST="${MODELS:-mlp}"
+  local OPTIMIZERS_LIST="${OPTIMIZERS:-sgd}"
+  local LRS_LIST="${LRS:-0.01}"
+  local LMAX_DECAYS_LIST="${LMAX_DECAYS:-0}"
+  local NUM_DATA_VAL="${NUM_DATA:-8192}"
+
+  for MODEL in $MODELS_LIST; do
+    for OPTIMIZER in $OPTIMIZERS_LIST; do
+      local BATCHES_LIST=""
+      if [[ -n "$BATCHES" ]]; then
+        BATCHES_LIST="$BATCHES"
+      elif [[ "$OPTIMIZER" == "full_gd" ]]; then
+        BATCHES_LIST="1"
+      else
+        BATCHES_LIST="8"
+      fi
+
+      for LR in $LRS_LIST; do
+        for BATCH in $BATCHES_LIST; do
+          for LMAX_DECAY in $LMAX_DECAYS_LIST; do
+            local EXTRA_EXPORTS="NUM_DATA=${NUM_DATA_VAL}"
+            if [[ -n "$STEPS" ]]; then
+              EXTRA_EXPORTS="${EXTRA_EXPORTS},STEPS=${STEPS}"
+            fi
+            if [[ -n "$DATASET" ]]; then
+              EXTRA_EXPORTS="${EXTRA_EXPORTS},DATASET=${DATASET}"
+            fi
+            if [[ -n "$LOSS" ]]; then
+              EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS}"
+            fi
+            if [[ -n "$CLASSES" ]]; then
+              EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
+            fi
+            submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$LMAX_DECAY" "$EXTRA_EXPORTS"
+          done
+        done
+      done
+    done
+  done
+}
+
+# =============================================================================
 # MAIN
 # =============================================================================
 
@@ -131,6 +251,9 @@ case "$PRESET" in
     ;;
   momentum)
     run_momentum_preset
+    ;;
+  custom)
+    run_custom_grid
     ;;
   all)
     run_full_gd_preset
