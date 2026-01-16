@@ -74,7 +74,7 @@ submit_job() {
 run_full_gd_preset() {
   echo "=== Full-GD Preset: models × LRs × decay ==="
   for MODEL in mlp cnn resnet; do
-    for LR in 0.0001 0.001 0.005 0.01; do
+    for LR in 0.001 0.005 0.01; do
       for LMAX_DECAY in 0 1; do
         submit_job "$MODEL" "full_gd" "$LR" "10000" "$LMAX_DECAY"
       done
