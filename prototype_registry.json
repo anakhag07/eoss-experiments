@@ -16,8 +16,8 @@
   },
   "imagenet32": {
     "mlp": {
-      "run_id": "",
-      "notes": "TODO: Run seed experiment"
+      "run_id": "20260107_1704_23_lr0.01000_b8",
+      "notes": "2-class (1 vs 9), batch=8, lr=0.01"
     }
   }
 }
