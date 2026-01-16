@@ -1,0 +1,23 @@
+{
+  "description": "Seed run IDs for feature prototype tracking. These runs must complete successfully before using --track-feature-prototypes-from.",
+  "cifar10": {
+    "mlp": {
+      "run_id": "20260108_1246_57_lr0.01000_b8",
+      "notes": "2-class (1 vs 9), batch=8, lr=0.01"
+    },
+    "cnn": {
+      "run_id": "20260115_1632_56_lr0.01000_b64",
+      "notes": "2-class (1 vs 9), batch=64, lr=0.01"
+    },
+    "resnet": {
+      "run_id": "20260115_1547_45_lr0.01000_b128",
+      "notes": "2-class (1 vs 9), batch=128, lr=0.01"
+    }
+  },
+  "imagenet32": {
+    "mlp": {
+      "run_id": "",
+      "notes": "TODO: Run seed experiment"
+    }
+  }
+}

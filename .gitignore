@@ -1,0 +1,12 @@
+# SLURM output logs
+logs/
+*.out
+
+# Python
+__pycache__/
+*.pyc
+
+# Editor
+.vscode/
+.idea/
+*.swp
