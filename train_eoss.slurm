@@ -115,5 +115,6 @@ python training.py \
   --lambdamax \
   --classes $CLASSES \
   --track-input-prototypes \
+  --rare-measure \
   $OPTIMIZER_FLAGS \
   $OPTIONAL_FLAGS
