@@ -17,10 +17,10 @@
 
 ```bash
 # Preview what will run
-./launch_ablation.sh --preset full_gd
+./launch_ablation.sh --preset fullgd
 
 # Submit all 24 jobs
-./launch_ablation.sh --preset full_gd --run
+./launch_ablation.sh --preset fullgd --run
 ```
 
 ### All Optimizer Ablations
@@ -32,7 +32,7 @@
 ### Single Custom Job
 
 ```bash
-sbatch --export=MODEL=cnn,OPTIMIZER=full_gd,LR=0.005,LMAX_DECAY=1 train_eoss.slurm
+sbatch --export=MODEL=cnn,OPTIMIZER=fullgd,LR=0.005,LMAX_DECAY=1 train_eoss.slurm
 ```
 
 ### Schedule Control
@@ -82,7 +82,7 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 
 **After** (one command):
 ```bash
-./launch_ablation.sh --preset full_gd --run
+./launch_ablation.sh --preset fullgd --run
 # Submits 24 jobs with correct prototypes and auto-calculated steps
 ```
 

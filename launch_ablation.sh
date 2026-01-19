@@ -5,7 +5,7 @@
 # Usage:
 #   ./launch_ablation.sh                          # Dry run (shows what would be submitted)
 #   ./launch_ablation.sh --run                    # Actually submit jobs
-#   ./launch_ablation.sh --preset full_gd         # Run full-GD preset
+#   ./launch_ablation.sh --preset fullgd          # Run full-GD preset
 #   ./launch_ablation.sh --preset sgd             # Run SGD preset
 #   ./launch_ablation.sh --preset all             # Run all presets
 #   ./launch_ablation.sh --custom --models "mlp cnn" --optimizers "sgd adam" \
@@ -19,7 +19,7 @@
 set -e
 
 DRY_RUN=true
-PRESET="full_gd"
+PRESET="fullgd"
 CUSTOM=false
 USE_PROTOTYPES=true
 
@@ -111,7 +111,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "Unknown argument: $1"
-      echo "Usage: $0 [--run] [--preset full_gd|sgd|adam|momentum|all]"
+      echo "Usage: $0 [--run] [--preset fullgd|sgd|adam|momentum|all]"
       echo "       $0 --custom --models \"...\" --optimizers \"...\" --lrs \"...\" [--batches \"...\"] [--lmax-decay \"...\"]"
       exit 1
       ;;
@@ -165,12 +165,12 @@ submit_job() {
 # PRESET DEFINITIONS
 # =============================================================================
 
-run_full_gd_preset() {
+run_fullgd_preset() {
   echo "=== Full-GD Preset: models × LRs × decay ==="
   for MODEL in mlp cnn resnet; do
     for LR in 0.001 0.005 0.01; do
       for LMAX_DECAY in 0 1; do
-        submit_job "$MODEL" "full_gd" "$LR" "10000" "$LMAX_DECAY"
+        submit_job "$MODEL" "fullgd" "$LR" "10000" "$LMAX_DECAY"
       done
     done
   done
@@ -238,7 +238,7 @@ run_custom_grid() {
       local BATCHES_LIST=""
       if [[ -n "$BATCHES" ]]; then
         BATCHES_LIST="$BATCHES"
-      elif [[ "$OPTIMIZER" == "full_gd" ]]; then
+      elif [[ "$OPTIMIZER" == "fullgd" ]]; then
         BATCHES_LIST="1"
       else
         BATCHES_LIST="8"
@@ -292,8 +292,8 @@ echo "=============================================="
 echo ""
 
 case "$PRESET" in
-  full_gd)
-    run_full_gd_preset
+  fullgd)
+    run_fullgd_preset
     ;;
   sgd)
     run_sgd_preset
@@ -308,7 +308,7 @@ case "$PRESET" in
     run_custom_grid
     ;;
   all)
-    run_full_gd_preset
+    run_fullgd_preset
     echo ""
     run_sgd_preset
     echo ""
@@ -318,7 +318,7 @@ case "$PRESET" in
     ;;
   *)
     echo "Unknown preset: $PRESET"
-    echo "Available presets: full_gd, sgd, adam, momentum, all"
+    echo "Available presets: fullgd, sgd, adam, momentum, all"
     exit 1
     ;;
 esac

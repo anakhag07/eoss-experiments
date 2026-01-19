@@ -15,12 +15,12 @@
 # Usage:
 #   sbatch --export=MODEL=mlp,OPTIMIZER=sgd,LR=0.01 train_eoss.slurm
 #   sbatch --export=MODEL=cnn,OPTIMIZER=adam,BATCH=64 train_eoss.slurm
-#   sbatch --export=MODEL=resnet,OPTIMIZER=full_gd,LR=0.005 train_eoss.slurm
+#   sbatch --export=MODEL=resnet,OPTIMIZER=fullgd,LR=0.005 train_eoss.slurm
 # =============================================================================
 
 # ---------- Hyperparameters from env (with defaults) ----------
 MODEL=${MODEL:-mlp}
-OPTIMIZER=${OPTIMIZER:-sgd}        # sgd, adam, momentum, full_gd
+OPTIMIZER=${OPTIMIZER:-sgd}        # sgd, adam, momentum, fullgd
 DATASET=${DATASET:-cifar10}
 LOSS=${LOSS:-ce}
 LR=${LR:-0.01}
@@ -37,7 +37,7 @@ TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
 
 # ---------- Auto-calculate steps if not provided ----------
 if [[ -z "$STEPS" ]]; then
-  if [[ "$OPTIMIZER" == "full_gd" ]]; then
+  if [[ "$OPTIMIZER" == "fullgd" ]]; then
     # Full-GD: 100/lr steps
     STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 100 / lr }')
   else
@@ -47,7 +47,7 @@ if [[ -z "$STEPS" ]]; then
 fi
 
 # ---------- Full-GD overrides batch to full dataset ----------
-if [[ "$OPTIMIZER" == "full_gd" ]]; then
+if [[ "$OPTIMIZER" == "fullgd" ]]; then
   BATCH="$NUM_DATA"
 fi
 
@@ -76,7 +76,7 @@ case "$OPTIMIZER" in
   momentum)
     OPTIMIZER_FLAGS="--momentum 0.9"
     ;;
-  full_gd|sgd)
+  fullgd|sgd)
     # No extra flags for vanilla SGD or full-GD
     ;;
   *)
@@ -99,7 +99,7 @@ if [[ -z "$EFFECTIVE_LMAX_SCHEDULE" ]]; then
 fi
 
 # Batch sharpness: skip for full-GD (times out on large batches)
-if [[ "$OPTIMIZER" != "full_gd" ]]; then
+if [[ "$OPTIMIZER" != "fullgd" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --batch-sharpness"
 fi
 
