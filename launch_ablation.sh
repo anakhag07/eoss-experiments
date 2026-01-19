@@ -29,6 +29,7 @@ STEPS=""
 DATASET=""
 LOSS=""
 CLASSES=""
+INIT_SCALE=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -86,6 +87,10 @@ while [[ $# -gt 0 ]]; do
       CLASSES="$2"
       shift 2
       ;;
+    --init-scale)
+      INIT_SCALE="$2"
+      shift 2
+      ;;
     --no-prototypes)
       USE_PROTOTYPES=false
       shift
@@ -126,6 +131,9 @@ submit_job() {
   local EXPORT_VARS="MODEL=${MODEL},OPTIMIZER=${OPTIMIZER},LR=${LR},BATCH=${BATCH},LMAX_DECAY=${LMAX_DECAY}"
   if [[ -n "$EXTRA_EXPORTS" ]]; then
     EXPORT_VARS="${EXPORT_VARS},${EXTRA_EXPORTS}"
+  fi
+  if [[ -n "$INIT_SCALE" ]]; then
+    EXPORT_VARS="${EXPORT_VARS},INIT_SCALE=${INIT_SCALE}"
   fi
   if [[ -n "$PROTO" ]]; then
     EXPORT_VARS="${EXPORT_VARS},TRACK_FEATURE_PROTOTYPES_FROM=${PROTO}"
@@ -192,7 +200,7 @@ run_custom_grid() {
   local OPTIMIZERS_LIST="${OPTIMIZERS:-sgd}"
   local LRS_LIST="${LRS:-0.01}"
   local LMAX_DECAYS_LIST="${LMAX_DECAYS:-0}"
-  local NUM_DATA_VAL="${NUM_DATA:-8192}"
+  local NUM_DATA_VAL="${NUM_DATA:-10000}"
 
   for MODEL in $MODELS_LIST; do
     for OPTIMIZER in $OPTIMIZERS_LIST; do
