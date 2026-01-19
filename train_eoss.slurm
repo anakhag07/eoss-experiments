@@ -101,25 +101,25 @@ if [[ -n "$TRACK_FEATURE_PROTOTYPES_FROM" ]]; then
 fi
 
 # ---------- Training command ----------
-export CMD = "python -u training.py \
-  --dataset "$DATASET" \
-  --model "$MODEL" \
-  --loss "$LOSS" \
-  --batch "$BATCH" \
-  --lr "$LR" \
-  --steps "$STEPS" \
-  --num-data "$NUM_DATA" \
-  --init-scale "$INIT_SCALE" \
-  --dataset-seed 111 \
-  --init-seed 8312 \
-  --stop-loss 0.00001 \
-  --lambdamax \
-  --classes $CLASSES \
-  --track-input-prototypes \
-  --rare-measure \
-  $OPTIMIZER_FLAGS \
-  $OPTIONAL_FLAGS"
-
-  echo "Running: $CMD"
-  eval $CMD
+CMD=(python -u training.py
+  --dataset "$DATASET"
+  --model "$MODEL"
+  --loss "$LOSS"
+  --batch "$BATCH"
+  --lr "$LR"
+  --steps "$STEPS"
+  --num-data "$NUM_DATA"
+  --init-scale "$INIT_SCALE"
+  --dataset-seed 111
+  --init-seed 8312
+  --stop-loss 0.00001
+  --lambdamax
+  --classes $CLASSES
+  --track-input-prototypes
+  --rare-measure
+  $OPTIMIZER_FLAGS
+  $OPTIONAL_FLAGS
+)
+echo "Running: ${CMD[*]}"
+"${CMD[@]}"
   
