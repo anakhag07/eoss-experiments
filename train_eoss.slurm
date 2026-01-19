@@ -25,7 +25,8 @@ DATASET=${DATASET:-cifar10}
 LOSS=${LOSS:-ce}
 LR=${LR:-0.01}
 BATCH=${BATCH:-8}
-NUM_DATA=${NUM_DATA:-8192}
+NUM_DATA=${NUM_DATA:-10000}
+INIT_SCALE=${INIT_SCALE:-0.2}
 STEPS=${STEPS:-}                   # Auto-calculated if empty
 LMAX_DECAY=${LMAX_DECAY:-0}
 CLASSES=${CLASSES:-"1 9"}
@@ -37,8 +38,8 @@ if [[ -z "$STEPS" ]]; then
     # Full-GD: 100/lr steps
     STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 100 / lr }')
   else
-    # SGD/Adam/Momentum: 500/lr steps
-    STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 500 / lr }')
+    # SGD/Adam/Momentum: 200/lr steps
+    STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 200 / lr }')
   fi
 fi
 
@@ -60,7 +61,7 @@ conda activate eoss
 cd /home/anakhag/projects/edge-of-stochastic-stability
 
 export WANDB_PROJECT="eoss-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
-export WANDB_DIR="/home/anakhag/projects/wandb_${WANDB_PROJECT}"
+export WANDB_DIR="/home/anakhag/projects/${WANDB_PROJECT}"
 mkdir -p "$WANDB_DIR"
 
 # ---------- Build optimizer flags ----------
@@ -100,7 +101,7 @@ if [[ -n "$TRACK_FEATURE_PROTOTYPES_FROM" ]]; then
 fi
 
 # ---------- Training command ----------
-python training.py \
+export CMD = "python -u training.py \
   --dataset "$DATASET" \
   --model "$MODEL" \
   --loss "$LOSS" \
@@ -108,7 +109,7 @@ python training.py \
   --lr "$LR" \
   --steps "$STEPS" \
   --num-data "$NUM_DATA" \
-  --init-scale 0.2 \
+  --init-scale "$INIT_SCALE" \
   --dataset-seed 111 \
   --init-seed 8312 \
   --stop-loss 0.00001 \
@@ -117,4 +118,8 @@ python training.py \
   --track-input-prototypes \
   --rare-measure \
   $OPTIMIZER_FLAGS \
-  $OPTIONAL_FLAGS
+  $OPTIONAL_FLAGS"
+
+  echo "Running: $CMD"
+  eval $CMD
+  
