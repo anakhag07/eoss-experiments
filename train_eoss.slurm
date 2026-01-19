@@ -28,7 +28,10 @@ BATCH=${BATCH:-8}
 NUM_DATA=${NUM_DATA:-10000}
 INIT_SCALE=${INIT_SCALE:-0.2}
 STEPS=${STEPS:-}                   # Auto-calculated if empty
+LMAX_SCHEDULE=${LMAX_SCHEDULE:-""} # none | decay | drop (empty => infer from LMAX_DECAY)
 LMAX_DECAY=${LMAX_DECAY:-0}
+LMAX_DROP_MULT=${LMAX_DROP_MULT:-0.5}
+LMAX_DROP_TARGET_LR=${LMAX_DROP_TARGET_LR:-""}
 CLASSES=${CLASSES:-"1 9"}
 TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
 
@@ -51,7 +54,7 @@ fi
 echo "=============================================="
 echo "MODEL=${MODEL}, OPTIMIZER=${OPTIMIZER}, DATASET=${DATASET}"
 echo "LR=${LR}, BATCH=${BATCH}, NUM_DATA=${NUM_DATA}, STEPS=${STEPS}"
-echo "LMAX_DECAY=${LMAX_DECAY}, CLASSES=${CLASSES}"
+echo "LMAX_SCHEDULE=${LMAX_SCHEDULE}, LMAX_DECAY=${LMAX_DECAY}, CLASSES=${CLASSES}"
 echo "=============================================="
 
 # ---------- Environment setup ----------
@@ -85,14 +88,29 @@ esac
 # ---------- Build optional flags ----------
 OPTIONAL_FLAGS=""
 
+# Lmax schedule selection (default to drop if LMAX_DECAY=1 and schedule unset)
+EFFECTIVE_LMAX_SCHEDULE="$LMAX_SCHEDULE"
+if [[ -z "$EFFECTIVE_LMAX_SCHEDULE" ]]; then
+  if [[ "$LMAX_DECAY" == "1" ]]; then
+    EFFECTIVE_LMAX_SCHEDULE="drop"
+  else
+    EFFECTIVE_LMAX_SCHEDULE="none"
+  fi
+fi
+
 # Batch sharpness: skip for full-GD (times out on large batches)
 if [[ "$OPTIMIZER" != "full_gd" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --batch-sharpness"
 fi
 
-# LR decay triggered by λ_max
-if [[ "$LMAX_DECAY" == "1" ]]; then
+# LR schedule triggered by λ_max
+if [[ "$EFFECTIVE_LMAX_SCHEDULE" == "decay" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lmax-decay --lmax-decay-target-lr 0.000001"
+elif [[ "$EFFECTIVE_LMAX_SCHEDULE" == "drop" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lmax-drop --lmax-drop-mult ${LMAX_DROP_MULT}"
+  if [[ -n "$LMAX_DROP_TARGET_LR" ]]; then
+    OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lmax-drop-target-lr ${LMAX_DROP_TARGET_LR}"
+  fi
 fi
 
 # Feature prototype tracking

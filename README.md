@@ -4,7 +4,7 @@
 
 | Ablation | Models | LRs | Other | Total Jobs |
 |----------|--------|-----|-------|------------|
-| **Full-GD + λ_max decay** | mlp, cnn, resnet | 0.0001, 0.001, 0.005, 0.01 | decay on/off | 24 |
+| **Full-GD + λ_max schedule** | mlp, cnn, resnet | 0.0001, 0.001, 0.005, 0.01 | drop/none | 24 |
 | SGD baselines | mlp | 0.001, 0.005, 0.01, 0.05 | batch 8/32/128 | 12 |
 | Adam | mlp | 0.001, 0.005, 0.01 | batch 8/32/64 | 9 |
 | Momentum | mlp | 0.001, 0.005, 0.01 | batch 8/32/64 | 9 |
@@ -35,6 +35,16 @@
 sbatch --export=MODEL=cnn,OPTIMIZER=full_gd,LR=0.005,LMAX_DECAY=1 train_eoss.slurm
 ```
 
+### Schedule Control
+
+```bash
+# Drop once when lambda_max crosses threshold (default when LMAX_DECAY=1)
+sbatch --export=MODEL=cnn,OPTIMIZER=sgd,LR=0.01,LMAX_SCHEDULE=drop,LMAX_DROP_MULT=0.5 train_eoss.slurm
+
+# Linear decay when lambda_max crosses threshold
+sbatch --export=MODEL=cnn,OPTIMIZER=sgd,LR=0.01,LMAX_SCHEDULE=decay train_eoss.slurm
+```
+
 ### Custom Grid (Loop Spec)
 
 ```bash
@@ -44,7 +54,7 @@ sbatch --export=MODEL=cnn,OPTIMIZER=full_gd,LR=0.005,LMAX_DECAY=1 train_eoss.slu
   --optimizers "sgd adam" \
   --lrs "0.001 0.005" \
   --batches "8 32" \
-  --lmax-decay "0 1"
+  --lmax-schedule "none drop"
 
 # Submit
 ./launch_ablation.sh --custom \
@@ -52,7 +62,7 @@ sbatch --export=MODEL=cnn,OPTIMIZER=full_gd,LR=0.005,LMAX_DECAY=1 train_eoss.slu
   --optimizers "sgd adam" \
   --lrs "0.001 0.005" \
   --batches "8 32" \
-  --lmax-decay "0 1" \
+  --lmax-schedule "none drop" \
   --run
 ```
 
@@ -82,7 +92,8 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 
 1. **Batch sharpness hangs on full-GD** → automatically disabled
 2. **Steps auto-calculated**: 100/lr for full-GD, 500/lr for SGD
-3. **Feature prototypes** require seed runs (already configured in `launch_ablation.sh`)
+3. **LR schedule default**: `LMAX_DECAY=1` maps to `drop` unless `LMAX_SCHEDULE` is set
+4. **Feature prototypes** require seed runs (already configured in `launch_ablation.sh`)
 
 ---
 

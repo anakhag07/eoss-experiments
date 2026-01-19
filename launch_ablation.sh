@@ -10,6 +10,10 @@
 #   ./launch_ablation.sh --preset all             # Run all presets
 #   ./launch_ablation.sh --custom --models "mlp cnn" --optimizers "sgd adam" \
 #     --lrs "0.001 0.005" --batches "8 32" --run   # Custom grid
+#
+# NEW (schedule):
+#   --lmax-schedule "none decay drop"
+#   --lmax-drop-mults "0.5 0.8"
 # =============================================================================
 
 set -e
@@ -24,6 +28,8 @@ OPTIMIZERS=""
 LRS=""
 BATCHES=""
 LMAX_DECAYS=""
+LMAX_SCHEDULES=""
+LMAX_DROP_MULTS=""
 NUM_DATA=""
 STEPS=""
 DATASET=""
@@ -65,6 +71,14 @@ while [[ $# -gt 0 ]]; do
       ;;
     --lmax-decay)
       LMAX_DECAYS="$2"
+      shift 2
+      ;;
+    --lmax-schedule)
+      LMAX_SCHEDULES="$2"
+      shift 2
+      ;;
+    --lmax-drop-mults)
+      LMAX_DROP_MULTS="$2"
       shift 2
       ;;
     --num-data)
@@ -200,7 +214,24 @@ run_custom_grid() {
   local OPTIMIZERS_LIST="${OPTIMIZERS:-sgd}"
   local LRS_LIST="${LRS:-0.01}"
   local LMAX_DECAYS_LIST="${LMAX_DECAYS:-0}"
+  local SCHEDULES_LIST=""
+  local DROP_MULTS_LIST="${LMAX_DROP_MULTS:-0.5}"
   local NUM_DATA_VAL="${NUM_DATA:-10000}"
+
+  if [[ -n "$LMAX_SCHEDULES" ]]; then
+    SCHEDULES_LIST="$LMAX_SCHEDULES"
+  elif [[ -n "$LMAX_DECAYS" ]]; then
+    SCHEDULES_LIST=""
+    for d in $LMAX_DECAYS; do
+      if [[ "$d" == "1" ]]; then
+        SCHEDULES_LIST="${SCHEDULES_LIST} drop"
+      else
+        SCHEDULES_LIST="${SCHEDULES_LIST} none"
+      fi
+    done
+  else
+    SCHEDULES_LIST="none"
+  fi
 
   for MODEL in $MODELS_LIST; do
     for OPTIMIZER in $OPTIMIZERS_LIST; do
@@ -215,21 +246,34 @@ run_custom_grid() {
 
       for LR in $LRS_LIST; do
         for BATCH in $BATCHES_LIST; do
-          for LMAX_DECAY in $LMAX_DECAYS_LIST; do
-            local EXTRA_EXPORTS="NUM_DATA=${NUM_DATA_VAL}"
-            if [[ -n "$STEPS" ]]; then
-              EXTRA_EXPORTS="${EXTRA_EXPORTS},STEPS=${STEPS}"
+          for SCHEDULE in $SCHEDULES_LIST; do
+            local DECAY_VALUE="0"
+            if [[ "$SCHEDULE" == "decay" || "$SCHEDULE" == "drop" ]]; then
+              DECAY_VALUE="1"
             fi
-            if [[ -n "$DATASET" ]]; then
-              EXTRA_EXPORTS="${EXTRA_EXPORTS},DATASET=${DATASET}"
+            local DROP_MULTS_FOR_SCHEDULE="1"
+            if [[ "$SCHEDULE" == "drop" ]]; then
+              DROP_MULTS_FOR_SCHEDULE="$DROP_MULTS_LIST"
             fi
-            if [[ -n "$LOSS" ]]; then
-              EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS}"
-            fi
-            if [[ -n "$CLASSES" ]]; then
-              EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
-            fi
-            submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$LMAX_DECAY" "$EXTRA_EXPORTS"
+            for DROP_MULT in $DROP_MULTS_FOR_SCHEDULE; do
+              local EXTRA_EXPORTS="NUM_DATA=${NUM_DATA_VAL},LMAX_SCHEDULE=${SCHEDULE}"
+              if [[ -n "$STEPS" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},STEPS=${STEPS}"
+              fi
+              if [[ -n "$DATASET" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},DATASET=${DATASET}"
+              fi
+              if [[ -n "$LOSS" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS}"
+              fi
+              if [[ -n "$CLASSES" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
+              fi
+              if [[ "$SCHEDULE" == "drop" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
+              fi
+              submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$EXTRA_EXPORTS"
+            done
           done
         done
       done
