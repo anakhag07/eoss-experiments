@@ -16,6 +16,7 @@
 #   sbatch --export=MODEL=mlp,OPTIMIZER=sgd,LR=0.01 train_eoss.slurm
 #   sbatch --export=MODEL=cnn,OPTIMIZER=adam,BATCH=64 train_eoss.slurm
 #   sbatch --export=MODEL=resnet,OPTIMIZER=fullgd,LR=0.005 train_eoss.slurm
+#   sbatch --export=PROJECT_NAME=my-project train_eoss.slurm
 # =============================================================================
 
 # ---------- Hyperparameters from env (with defaults) ----------
@@ -24,7 +25,7 @@ OPTIMIZER=${OPTIMIZER:-sgd}        # sgd, adam, momentum, fullgd
 DATASET=${DATASET:-cifar10}
 LOSS=${LOSS:-ce}
 LR=${LR:-0.01}
-BATCH=${BATCH:-8}
+BATCH=${BATCH:-128}
 NUM_DATA=${NUM_DATA:-10000}
 INIT_SCALE=${INIT_SCALE:-0.2}
 STEPS=${STEPS:-}                   # Auto-calculated if empty
@@ -34,12 +35,17 @@ LMAX_DROP_MULT=${LMAX_DROP_MULT:-0.5}
 LMAX_DROP_TARGET_LR=${LMAX_DROP_TARGET_LR:-""}
 CLASSES=${CLASSES:-"1 9"}
 TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
+PROJECT_NAME=${PROJECT_NAME:-""}
+WANDB_DIR=${WANDB_DIR:-""}
 
 # ---------- Auto-calculate steps if not provided ----------
 if [[ -z "$STEPS" ]]; then
-  if [[ "$OPTIMIZER" == "fullgd" ]]; then
+  if [[ "$OPTIMIZER" == "fullgd" ]] && [[ "$LOSS" == "ce" ]]; then
     # Full-GD: 100/lr steps
     STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 100 / lr }')
+  elif [[ "$OPTIMIZER" == "fullgd" ]] && [[ "$LOSS" == "mse" ]]; then
+    # Full-GD with MSE loss: 200/lr steps
+    STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 200 / lr }')
   else
     # SGD/Adam/Momentum: 200/lr steps
     STEPS=$(awk -v lr="$LR" 'BEGIN { printf "%d", 200 / lr }')
@@ -63,8 +69,16 @@ conda activate eoss
 
 cd /home/anakhag/projects/edge-of-stochastic-stability
 
-export WANDB_PROJECT="eoss-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
-export WANDB_DIR="/home/anakhag/projects/${WANDB_PROJECT}"
+if [[ -n "$PROJECT_NAME" ]]; then
+  export WANDB_PROJECT="$PROJECT_NAME"
+else
+  export WANDB_PROJECT="eoss-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
+fi
+if [[ -n "$WANDB_DIR" ]]; then
+  export WANDB_DIR="$WANDB_DIR"
+else
+  export WANDB_DIR="/home/anakhag/projects/${WANDB_PROJECT}"
+fi
 mkdir -p "$WANDB_DIR"
 
 # ---------- Build optimizer flags ----------
@@ -86,7 +100,8 @@ case "$OPTIMIZER" in
 esac
 
 # ---------- Build optional flags ----------
-OPTIONAL_FLAGS=""
+# Start with any user-provided OPTIONAL_FLAGS from the environment, then append.
+OPTIONAL_FLAGS="${OPTIONAL_FLAGS:-}"
 
 # Lmax schedule selection (default to drop if LMAX_DECAY=1 and schedule unset)
 EFFECTIVE_LMAX_SCHEDULE="$LMAX_SCHEDULE"
