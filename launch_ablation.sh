@@ -10,6 +10,7 @@
 #   ./launch_ablation.sh --preset all             # Run all presets
 #   ./launch_ablation.sh --custom --models "mlp cnn" --optimizers "sgd adam" \
 #     --lrs "0.001 0.005" --batches "8 32" --run   # Custom grid
+#   ./launch_ablation.sh --custom --optional-flags "--train-input-x-outliers 20 --train-input-y-outliers 5"
 #   ./launch_ablation.sh --project-name my-project --run
 #
 # NEW (schedule):
@@ -38,6 +39,7 @@ LOSS=""
 CLASSES=""
 INIT_SCALE=""
 PROJECT_NAME=""
+OPTIONAL_FLAGS=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -113,6 +115,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --project-name)
       PROJECT_NAME="$2"
+      shift 2
+      ;;
+    --optional-flags)
+      OPTIONAL_FLAGS="$2"
       shift 2
       ;;
     *)
@@ -277,12 +283,15 @@ run_custom_grid() {
                 if [[ -n "$LOSS_VAL" ]]; then
                   EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS_VAL}"
                 fi
-                if [[ -n "$CLASSES" ]]; then
-                  EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
-                fi
-                if [[ "$SCHEDULE" == "drop" ]]; then
-                  EXTRA_EXPORTS="${EXTRA_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
-                fi
+              if [[ -n "$CLASSES" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
+              fi
+              if [[ -n "$OPTIONAL_FLAGS" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},OPTIONAL_FLAGS=${OPTIONAL_FLAGS}"
+              fi
+              if [[ "$SCHEDULE" == "drop" ]]; then
+                EXTRA_EXPORTS="${EXTRA_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
+              fi
                 submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$EXTRA_EXPORTS"
               done
             done

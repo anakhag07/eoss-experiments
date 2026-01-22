@@ -36,7 +36,6 @@ LMAX_DROP_TARGET_LR=${LMAX_DROP_TARGET_LR:-""}
 CLASSES=${CLASSES:-"1 9"}
 TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
 PROJECT_NAME=${PROJECT_NAME:-""}
-WANDB_DIR=${WANDB_DIR:-""}
 
 # ---------- Auto-calculate steps if not provided ----------
 if [[ -z "$STEPS" ]]; then
@@ -74,11 +73,7 @@ if [[ -n "$PROJECT_NAME" ]]; then
 else
   export WANDB_PROJECT="eoss-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
 fi
-if [[ -n "$WANDB_DIR" ]]; then
-  export WANDB_DIR="$WANDB_DIR"
-else
-  export WANDB_DIR="/home/anakhag/projects/${WANDB_PROJECT}"
-fi
+export WANDB_DIR="/home/anakhag/projects/${WANDB_PROJECT}"
 mkdir -p "$WANDB_DIR"
 
 # ---------- Build optimizer flags ----------
