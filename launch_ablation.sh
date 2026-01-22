@@ -10,6 +10,7 @@
 #   ./launch_ablation.sh --preset all             # Run all presets
 #   ./launch_ablation.sh --custom --models "mlp cnn" --optimizers "sgd adam" \
 #     --lrs "0.001 0.005" --batches "8 32" --run   # Custom grid
+#   ./launch_ablation.sh --project-name my-project --run
 #
 # NEW (schedule):
 #   --lmax-schedule "none decay drop"
@@ -36,6 +37,7 @@ DATASET=""
 LOSS=""
 CLASSES=""
 INIT_SCALE=""
+PROJECT_NAME=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -109,6 +111,10 @@ while [[ $# -gt 0 ]]; do
       USE_PROTOTYPES=false
       shift
       ;;
+    --project-name)
+      PROJECT_NAME="$2"
+      shift 2
+      ;;
     *)
       echo "Unknown argument: $1"
       echo "Usage: $0 [--run] [--preset fullgd|sgd|adam|momentum|all]"
@@ -145,6 +151,9 @@ submit_job() {
   local EXPORT_VARS="MODEL=${MODEL},OPTIMIZER=${OPTIMIZER},LR=${LR},BATCH=${BATCH},LMAX_DECAY=${LMAX_DECAY}"
   if [[ -n "$EXTRA_EXPORTS" ]]; then
     EXPORT_VARS="${EXPORT_VARS},${EXTRA_EXPORTS}"
+  fi
+  if [[ -n "$PROJECT_NAME" ]]; then
+    EXPORT_VARS="${EXPORT_VARS},PROJECT_NAME=${PROJECT_NAME}"
   fi
   if [[ -n "$INIT_SCALE" ]]; then
     EXPORT_VARS="${EXPORT_VARS},INIT_SCALE=${INIT_SCALE}"
@@ -239,9 +248,9 @@ run_custom_grid() {
       if [[ -n "$BATCHES" ]]; then
         BATCHES_LIST="$BATCHES"
       elif [[ "$OPTIMIZER" == "fullgd" ]]; then
-        BATCHES_LIST="1"
+        BATCHES_LIST="$NUM_DATA_VAL"
       else
-        BATCHES_LIST="8"
+        BATCHES_LIST="128"
       fi
 
       for LR in $LRS_LIST; do
