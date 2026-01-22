@@ -226,6 +226,7 @@ run_custom_grid() {
   local SCHEDULES_LIST=""
   local DROP_MULTS_LIST="${LMAX_DROP_MULTS:-0.5}"
   local NUM_DATA_VAL="${NUM_DATA:-10000}"
+  local LOSS_LIST="${LOSS:-ce}"
 
   if [[ -n "$LMAX_SCHEDULES" ]]; then
     SCHEDULES_LIST="$LMAX_SCHEDULES"
@@ -265,23 +266,25 @@ run_custom_grid() {
               DROP_MULTS_FOR_SCHEDULE="$DROP_MULTS_LIST"
             fi
             for DROP_MULT in $DROP_MULTS_FOR_SCHEDULE; do
-              local EXTRA_EXPORTS="NUM_DATA=${NUM_DATA_VAL},LMAX_SCHEDULE=${SCHEDULE}"
-              if [[ -n "$STEPS" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},STEPS=${STEPS}"
-              fi
-              if [[ -n "$DATASET" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},DATASET=${DATASET}"
-              fi
-              if [[ -n "$LOSS" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS}"
-              fi
-              if [[ -n "$CLASSES" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
-              fi
-              if [[ "$SCHEDULE" == "drop" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
-              fi
-              submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$EXTRA_EXPORTS"
+              for LOSS_VAL in $LOSS_LIST; do
+                local EXTRA_EXPORTS="NUM_DATA=${NUM_DATA_VAL},LMAX_SCHEDULE=${SCHEDULE}"
+                if [[ -n "$STEPS" ]]; then
+                  EXTRA_EXPORTS="${EXTRA_EXPORTS},STEPS=${STEPS}"
+                fi
+                if [[ -n "$DATASET" ]]; then
+                  EXTRA_EXPORTS="${EXTRA_EXPORTS},DATASET=${DATASET}"
+                fi
+                if [[ -n "$LOSS_VAL" ]]; then
+                  EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS_VAL}"
+                fi
+                if [[ -n "$CLASSES" ]]; then
+                  EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
+                fi
+                if [[ "$SCHEDULE" == "drop" ]]; then
+                  EXTRA_EXPORTS="${EXTRA_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
+                fi
+                submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$EXTRA_EXPORTS"
+              done
             done
           done
         done
