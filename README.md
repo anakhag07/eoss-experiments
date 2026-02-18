@@ -32,7 +32,7 @@
 ### Single Custom Job
 
 ```bash
-sbatch --export=MODEL=cnn,OPTIMIZER=fullgd,LR=0.005,LMAX_DECAY=1 train_eoss.slurm
+sbatch --export=MODEL=cnn,OPTIMIZER=fullgd,LR=0.005,PROJECT_NAME=eoss-train-run,LMAX_DECAY=1 train_eoss.slurm
 ```
 
 ### Schedule Control
@@ -55,6 +55,7 @@ sbatch --export=MODEL=cnn,OPTIMIZER=sgd,LR=0.01,LMAX_SCHEDULE=decay train_eoss.s
   --lrs "0.001 0.005" \
   --batches "8 32" \
   --lmax-schedule "none drop"
+  --project-name "eoss-train-with-outliers"
 
 # Submit
 ./launch_ablation.sh --custom \
@@ -63,6 +64,7 @@ sbatch --export=MODEL=cnn,OPTIMIZER=sgd,LR=0.01,LMAX_SCHEDULE=decay train_eoss.s
   --lrs "0.001 0.005" \
   --batches "8 32" \
   --lmax-schedule "none drop" \
+  --project-name "eoss-train-with-outliers" \
   --run
 ```
 
