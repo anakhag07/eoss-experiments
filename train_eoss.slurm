@@ -36,6 +36,11 @@ LMAX_DROP_TARGET_LR=${LMAX_DROP_TARGET_LR:-""}
 CLASSES=${CLASSES:-"1 9"}
 TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
 PROJECT_NAME=${PROJECT_NAME:-""}
+INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE:-"train"}  # train | val
+TRAIN_INPUT_PROTOTYPES=${TRAIN_INPUT_PROTOTYPES:-"generate"}
+TEST_INPUT_PROTOTYPES=${TEST_INPUT_PROTOTYPES:-""}
+INPUT_PROTOTYPES_HOLDOUT_COUNT=${INPUT_PROTOTYPES_HOLDOUT_COUNT:-""}
+INPUT_PROTOTYPE_HOLDOUT_FRAC=${INPUT_PROTOTYPE_HOLDOUT_FRAC:-""}
 
 # ---------- Auto-calculate steps if not provided ----------
 if [[ -z "$STEPS" ]]; then
@@ -128,6 +133,22 @@ if [[ -n "$TRACK_FEATURE_PROTOTYPES_FROM" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --track-feature-prototypes-from $TRACK_FEATURE_PROTOTYPES_FROM"
 fi
 
+# Unified input-prototype mode (train/val)
+if [[ -n "$INPUT_PROTOTYPES_MODE" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-mode $INPUT_PROTOTYPES_MODE"
+fi
+if [[ -n "$TRAIN_INPUT_PROTOTYPES" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --train-input-prototypes $TRAIN_INPUT_PROTOTYPES"
+fi
+if [[ -n "$TEST_INPUT_PROTOTYPES" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --test-input-prototypes $TEST_INPUT_PROTOTYPES"
+fi
+if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_COUNT" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-count $INPUT_PROTOTYPES_HOLDOUT_COUNT"
+elif [[ -n "$INPUT_PROTOTYPE_HOLDOUT_FRAC" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototype-holdout-frac $INPUT_PROTOTYPE_HOLDOUT_FRAC"
+fi
+
 # ---------- Training command ----------
 CMD=(python -u training.py
   --dataset "$DATASET"
@@ -143,7 +164,6 @@ CMD=(python -u training.py
   --stop-loss 0.00001
   --lambdamax
   --classes $CLASSES
-  --track-input-prototypes
   --rare-measure
   $OPTIMIZER_FLAGS
   $OPTIONAL_FLAGS
