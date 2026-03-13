@@ -40,6 +40,12 @@ CLASSES=""
 INIT_SCALE=""
 PROJECT_NAME=""
 OPTIONAL_FLAGS=""
+INPUT_PROTOTYPES_MODES=""
+TRAIN_INPUT_PROTOTYPES_LIST=""
+HOLDOUT_BOUNDARY_COUNTS=""
+HOLDOUT_INLIERS_COUNTS=""
+HOLDOUT_X_OUTLIER_COUNTS=""
+HOLDOUT_Y_OUTLIER_COUNTS=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -119,6 +125,30 @@ while [[ $# -gt 0 ]]; do
       ;;
     --optional-flags)
       OPTIONAL_FLAGS="$2"
+      shift 2
+      ;;
+    --input-prototypes-modes)
+      INPUT_PROTOTYPES_MODES="$2"
+      shift 2
+      ;;
+    --train-input-prototypes)
+      TRAIN_INPUT_PROTOTYPES_LIST="$2"
+      shift 2
+      ;;
+    --holdout-boundary-counts)
+      HOLDOUT_BOUNDARY_COUNTS="$2"
+      shift 2
+      ;;
+    --holdout-inliers-counts)
+      HOLDOUT_INLIERS_COUNTS="$2"
+      shift 2
+      ;;
+    --holdout-x-outlier-counts)
+      HOLDOUT_X_OUTLIER_COUNTS="$2"
+      shift 2
+      ;;
+    --holdout-y-outlier-counts)
+      HOLDOUT_Y_OUTLIER_COUNTS="$2"
       shift 2
       ;;
     *)
@@ -233,6 +263,12 @@ run_custom_grid() {
   local DROP_MULTS_LIST="${LMAX_DROP_MULTS:-0.5}"
   local NUM_DATA_VAL="${NUM_DATA:-10000}"
   local LOSS_LIST="${LOSS:-ce}"
+  local INPUT_PROTOTYPES_MODES_LIST="${INPUT_PROTOTYPES_MODES:-train}"
+  local TRAIN_INPUT_PROTOTYPES_VALUES="${TRAIN_INPUT_PROTOTYPES_LIST:-generate}"
+  local HOLDOUT_BOUNDARY_COUNTS_LIST="${HOLDOUT_BOUNDARY_COUNTS:-10}"
+  local HOLDOUT_INLIERS_COUNTS_LIST="${HOLDOUT_INLIERS_COUNTS:-10}"
+  local HOLDOUT_X_OUTLIER_COUNTS_LIST="${HOLDOUT_X_OUTLIER_COUNTS:-__UNSET__}"
+  local HOLDOUT_Y_OUTLIER_COUNTS_LIST="${HOLDOUT_Y_OUTLIER_COUNTS:-__UNSET__}"
 
   if [[ -n "$LMAX_SCHEDULES" ]]; then
     SCHEDULES_LIST="$LMAX_SCHEDULES"
@@ -273,26 +309,51 @@ run_custom_grid() {
             fi
             for DROP_MULT in $DROP_MULTS_FOR_SCHEDULE; do
               for LOSS_VAL in $LOSS_LIST; do
-                local EXTRA_EXPORTS="NUM_DATA=${NUM_DATA_VAL},LMAX_SCHEDULE=${SCHEDULE}"
+                local BASE_EXPORTS="NUM_DATA=${NUM_DATA_VAL},LMAX_SCHEDULE=${SCHEDULE}"
                 if [[ -n "$STEPS" ]]; then
-                  EXTRA_EXPORTS="${EXTRA_EXPORTS},STEPS=${STEPS}"
+                  BASE_EXPORTS="${BASE_EXPORTS},STEPS=${STEPS}"
                 fi
                 if [[ -n "$DATASET" ]]; then
-                  EXTRA_EXPORTS="${EXTRA_EXPORTS},DATASET=${DATASET}"
+                  BASE_EXPORTS="${BASE_EXPORTS},DATASET=${DATASET}"
                 fi
                 if [[ -n "$LOSS_VAL" ]]; then
-                  EXTRA_EXPORTS="${EXTRA_EXPORTS},LOSS=${LOSS_VAL}"
+                  BASE_EXPORTS="${BASE_EXPORTS},LOSS=${LOSS_VAL}"
                 fi
-              if [[ -n "$CLASSES" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},CLASSES=${CLASSES}"
-              fi
-              if [[ -n "$OPTIONAL_FLAGS" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},OPTIONAL_FLAGS=${OPTIONAL_FLAGS}"
-              fi
-              if [[ "$SCHEDULE" == "drop" ]]; then
-                EXTRA_EXPORTS="${EXTRA_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
-              fi
-                submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$EXTRA_EXPORTS"
+                if [[ -n "$CLASSES" ]]; then
+                  BASE_EXPORTS="${BASE_EXPORTS},CLASSES=${CLASSES}"
+                fi
+                if [[ -n "$OPTIONAL_FLAGS" ]]; then
+                  BASE_EXPORTS="${BASE_EXPORTS},OPTIONAL_FLAGS=${OPTIONAL_FLAGS}"
+                fi
+                if [[ "$SCHEDULE" == "drop" ]]; then
+                  BASE_EXPORTS="${BASE_EXPORTS},LMAX_DROP_MULT=${DROP_MULT}"
+                fi
+
+                for INPUT_PROTOTYPES_MODE_VAL in $INPUT_PROTOTYPES_MODES_LIST; do
+                  for TRAIN_INPUT_PROTOTYPES_VAL in $TRAIN_INPUT_PROTOTYPES_VALUES; do
+                    local PROTO_EXPORTS="${BASE_EXPORTS},INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE_VAL},TRAIN_INPUT_PROTOTYPES=${TRAIN_INPUT_PROTOTYPES_VAL}"
+                    if [[ "$INPUT_PROTOTYPES_MODE_VAL" == "val" ]]; then
+                      for HOLDOUT_BOUNDARY_COUNT_VAL in $HOLDOUT_BOUNDARY_COUNTS_LIST; do
+                        for HOLDOUT_INLIERS_COUNT_VAL in $HOLDOUT_INLIERS_COUNTS_LIST; do
+                          for HOLDOUT_X_OUTLIER_COUNT_VAL in $HOLDOUT_X_OUTLIER_COUNTS_LIST; do
+                            for HOLDOUT_Y_OUTLIER_COUNT_VAL in $HOLDOUT_Y_OUTLIER_COUNTS_LIST; do
+                              local VAL_EXPORTS="${PROTO_EXPORTS},INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT=${HOLDOUT_BOUNDARY_COUNT_VAL},INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT=${HOLDOUT_INLIERS_COUNT_VAL}"
+                              if [[ "$HOLDOUT_X_OUTLIER_COUNT_VAL" != "__UNSET__" ]]; then
+                                VAL_EXPORTS="${VAL_EXPORTS},INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT=${HOLDOUT_X_OUTLIER_COUNT_VAL}"
+                              fi
+                              if [[ "$HOLDOUT_Y_OUTLIER_COUNT_VAL" != "__UNSET__" ]]; then
+                                VAL_EXPORTS="${VAL_EXPORTS},INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT=${HOLDOUT_Y_OUTLIER_COUNT_VAL}"
+                              fi
+                              submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$VAL_EXPORTS"
+                            done
+                          done
+                        done
+                      done
+                    else
+                      submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$PROTO_EXPORTS"
+                    fi
+                  done
+                done
               done
             done
           done
