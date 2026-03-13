@@ -96,6 +96,7 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 2. **Steps auto-calculated**: 100/lr for full-GD, 500/lr for SGD
 3. **LR schedule default**: `LMAX_DECAY=1` maps to `drop` unless `LMAX_SCHEDULE` is set
 4. **Feature prototypes** require seed runs (already configured in `launch_ablation.sh`)
+5. **Adam sharpness metric**: `train_eoss.slurm` always adds `--precond-lmax` when `OPTIMIZER=adam`
 
 ---
 

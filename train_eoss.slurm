@@ -39,6 +39,10 @@ PROJECT_NAME=${PROJECT_NAME:-""}
 INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE:-"train"}  # train | val
 TRAIN_INPUT_PROTOTYPES=${TRAIN_INPUT_PROTOTYPES:-"generate"}
 TEST_INPUT_PROTOTYPES=${TEST_INPUT_PROTOTYPES:-""}
+INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT=${INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT:-""}
+INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT=${INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT:-""}
+INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT=${INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT:-""}
+INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT=${INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT:-""}
 INPUT_PROTOTYPES_HOLDOUT_COUNT=${INPUT_PROTOTYPES_HOLDOUT_COUNT:-""}
 INPUT_PROTOTYPE_HOLDOUT_FRAC=${INPUT_PROTOTYPE_HOLDOUT_FRAC:-""}
 
@@ -71,21 +75,21 @@ echo "=============================================="
 module load miniforge/24.3.0-0
 conda activate eoss
 
-cd /home/anakhag/projects/edge-of-stochastic-stability
+cd /home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization
 
 if [[ -n "$PROJECT_NAME" ]]; then
   export WANDB_PROJECT="$PROJECT_NAME"
 else
   export WANDB_PROJECT="eoss-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
 fi
-export WANDB_DIR="/home/anakhag/projects/${WANDB_PROJECT}"
+export WANDB_DIR="/home/anakhag/projects/eos/${WANDB_PROJECT}"
 mkdir -p "$WANDB_DIR"
 
 # ---------- Build optimizer flags ----------
 OPTIMIZER_FLAGS=""
 case "$OPTIMIZER" in
   adam)
-    OPTIMIZER_FLAGS="--adam"
+    OPTIMIZER_FLAGS="--adam --precond-lmax"
     ;;
   momentum)
     OPTIMIZER_FLAGS="--momentum 0.9"
@@ -143,9 +147,25 @@ fi
 if [[ -n "$TEST_INPUT_PROTOTYPES" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --test-input-prototypes $TEST_INPUT_PROTOTYPES"
 fi
-if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_COUNT" ]]; then
+
+# New holdout overrides
+if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-boundary-count $INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT"
+fi
+if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-inliers-count $INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT"
+fi
+if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-x-outlier-count $INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT"
+fi
+if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-y-outlier-count $INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT"
+fi
+
+# Backward-compatible legacy holdout settings (only if new overrides are unset)
+if [[ -z "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]] && [[ -n "$INPUT_PROTOTYPES_HOLDOUT_COUNT" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-count $INPUT_PROTOTYPES_HOLDOUT_COUNT"
-elif [[ -n "$INPUT_PROTOTYPE_HOLDOUT_FRAC" ]]; then
+elif [[ -z "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]] && [[ -n "$INPUT_PROTOTYPE_HOLDOUT_FRAC" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototype-holdout-frac $INPUT_PROTOTYPE_HOLDOUT_FRAC"
 fi
 
@@ -164,7 +184,6 @@ CMD=(python -u training.py
   --stop-loss 0.00001
   --lambdamax
   --classes $CLASSES
-  --rare-measure
   $OPTIMIZER_FLAGS
   $OPTIONAL_FLAGS
 )
