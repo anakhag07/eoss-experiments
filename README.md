@@ -35,6 +35,20 @@
 sbatch --export=MODEL=cnn,OPTIMIZER=fullgd,LR=0.005,PROJECT_NAME=eoss-train-run,LMAX_DECAY=1 train_eoss.slurm
 ```
 
+### Config-First Job
+
+`train_eoss.slurm` now launches `training.py` with a base JSON config and then applies env-driven CLI overrides on top.
+
+```bash
+sbatch --export=CONFIG_PATH=configs/your_base.json,MODEL=cnn,OPTIMIZER=sgd,LR=0.01 train_eoss.slurm
+```
+
+You can also pass the config through the ablation launcher:
+
+```bash
+./launch_ablation.sh --preset sgd --config-path configs/your_base.json --run
+```
+
 ### Schedule Control
 
 ```bash
@@ -97,6 +111,7 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 3. **LR schedule default**: `LMAX_DECAY=1` maps to `drop` unless `LMAX_SCHEDULE` is set
 4. **Feature prototypes** require seed runs (already configured in `launch_ablation.sh`)
 5. **Adam sharpness metric**: `train_eoss.slurm` always adds `--precond-lmax` when `OPTIMIZER=adam`
+6. **Base config precedence**: `CONFIG_PATH` supplies defaults, but exported env vars still win because they are emitted as CLI overrides
 
 ---
 

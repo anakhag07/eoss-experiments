@@ -12,6 +12,7 @@
 #     --lrs "0.001 0.005" --batches "8 32" --run   # Custom grid
 #   ./launch_ablation.sh --custom --optional-flags "--train-input-x-outliers 20 --train-input-y-outliers 5"
 #   ./launch_ablation.sh --project-name my-project --run
+#   ./launch_ablation.sh --preset sgd --config-path configs/your_base.json --run
 #
 # NEW (schedule):
 #   --lmax-schedule "none decay drop"
@@ -39,6 +40,7 @@ LOSS=""
 CLASSES=""
 INIT_SCALE=""
 PROJECT_NAME=""
+CONFIG_PATH=""
 OPTIONAL_FLAGS=""
 INPUT_PROTOTYPES_MODES=""
 TRAIN_INPUT_PROTOTYPES_LIST=""
@@ -123,6 +125,10 @@ while [[ $# -gt 0 ]]; do
       PROJECT_NAME="$2"
       shift 2
       ;;
+    --config-path)
+      CONFIG_PATH="$2"
+      shift 2
+      ;;
     --optional-flags)
       OPTIONAL_FLAGS="$2"
       shift 2
@@ -190,6 +196,9 @@ submit_job() {
   fi
   if [[ -n "$PROJECT_NAME" ]]; then
     EXPORT_VARS="${EXPORT_VARS},PROJECT_NAME=${PROJECT_NAME}"
+  fi
+  if [[ -n "$CONFIG_PATH" ]]; then
+    EXPORT_VARS="${EXPORT_VARS},CONFIG_PATH=${CONFIG_PATH}"
   fi
   if [[ -n "$INIT_SCALE" ]]; then
     EXPORT_VARS="${EXPORT_VARS},INIT_SCALE=${INIT_SCALE}"

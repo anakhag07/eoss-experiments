@@ -17,6 +17,7 @@
 #   sbatch --export=MODEL=cnn,OPTIMIZER=adam,BATCH=64 train_eoss.slurm
 #   sbatch --export=MODEL=resnet,OPTIMIZER=fullgd,LR=0.005 train_eoss.slurm
 #   sbatch --export=PROJECT_NAME=my-project train_eoss.slurm
+#   sbatch --export=CONFIG_PATH=configs/your_base.json,MODEL=mlp train_eoss.slurm
 # =============================================================================
 
 # ---------- Hyperparameters from env (with defaults) ----------
@@ -45,6 +46,10 @@ INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT=${INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_CO
 INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT=${INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT:-""}
 INPUT_PROTOTYPES_HOLDOUT_COUNT=${INPUT_PROTOTYPES_HOLDOUT_COUNT:-""}
 INPUT_PROTOTYPE_HOLDOUT_FRAC=${INPUT_PROTOTYPE_HOLDOUT_FRAC:-""}
+CONFIG_PATH=${CONFIG_PATH:-configs/your_base.json}
+REPO_ROOT=${REPO_ROOT:-/home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization}
+SKIP_ENV_SETUP=${SKIP_ENV_SETUP:-0}
+PRINT_COMMAND_ONLY=${PRINT_COMMAND_ONLY:-0}
 
 # ---------- Auto-calculate steps if not provided ----------
 if [[ -z "$STEPS" ]]; then
@@ -69,13 +74,21 @@ echo "=============================================="
 echo "MODEL=${MODEL}, OPTIMIZER=${OPTIMIZER}, DATASET=${DATASET}"
 echo "LR=${LR}, BATCH=${BATCH}, NUM_DATA=${NUM_DATA}, STEPS=${STEPS}"
 echo "LMAX_SCHEDULE=${LMAX_SCHEDULE}, LMAX_DECAY=${LMAX_DECAY}, CLASSES=${CLASSES}"
+echo "CONFIG_PATH=${CONFIG_PATH}"
 echo "=============================================="
 
 # ---------- Environment setup ----------
-module load miniforge/24.3.0-0
-conda activate eoss
+if [[ "$SKIP_ENV_SETUP" != "1" ]]; then
+  module load miniforge/24.3.0-0
+  conda activate eoss
+fi
 
-cd /home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization
+cd "$REPO_ROOT"
+
+if [[ ! -f "$CONFIG_PATH" ]]; then
+  echo "Config file not found: $CONFIG_PATH"
+  exit 1
+fi
 
 if [[ -n "$PROJECT_NAME" ]]; then
   export WANDB_PROJECT="$PROJECT_NAME"
@@ -106,6 +119,16 @@ esac
 # ---------- Build optional flags ----------
 # Start with any user-provided OPTIONAL_FLAGS from the environment, then append.
 OPTIONAL_FLAGS="${OPTIONAL_FLAGS:-}"
+
+append_split_args() {
+  local raw="$1"
+  if [[ -n "$raw" ]]; then
+    # Intentional word splitting for shell-like override strings.
+    # shellcheck disable=SC2206
+    local split_args=( $raw )
+    CMD+=("${split_args[@]}")
+  fi
+}
 
 # Lmax schedule selection (default to drop if LMAX_DECAY=1 and schedule unset)
 EFFECTIVE_LMAX_SCHEDULE="$LMAX_SCHEDULE"
@@ -164,13 +187,16 @@ fi
 
 # Backward-compatible legacy holdout settings (only if new overrides are unset)
 if [[ -z "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]] && [[ -n "$INPUT_PROTOTYPES_HOLDOUT_COUNT" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-count $INPUT_PROTOTYPES_HOLDOUT_COUNT"
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-boundary-count $INPUT_PROTOTYPES_HOLDOUT_COUNT --input-prototypes-holdout-inliers-count $INPUT_PROTOTYPES_HOLDOUT_COUNT"
 elif [[ -z "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]] && [[ -n "$INPUT_PROTOTYPE_HOLDOUT_FRAC" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototype-holdout-frac $INPUT_PROTOTYPE_HOLDOUT_FRAC"
 fi
 
 # ---------- Training command ----------
+read -r -a CLASSES_ARRAY <<< "$CLASSES"
+
 CMD=(python -u training.py
+  --config "$CONFIG_PATH"
   --dataset "$DATASET"
   --model "$MODEL"
   --loss "$LOSS"
@@ -183,10 +209,17 @@ CMD=(python -u training.py
   --init-seed 8312
   --stop-loss 0.00001
   --lambdamax
-  --classes $CLASSES
-  $OPTIMIZER_FLAGS
-  $OPTIONAL_FLAGS
 )
+if [[ ${#CLASSES_ARRAY[@]} -gt 0 ]]; then
+  CMD+=(--classes "${CLASSES_ARRAY[@]}")
+fi
+append_split_args "$OPTIMIZER_FLAGS"
+append_split_args "$OPTIONAL_FLAGS"
+
 echo "Running: ${CMD[*]}"
+if [[ "$PRINT_COMMAND_ONLY" == "1" ]]; then
+  exit 0
+fi
+
 "${CMD[@]}"
   
