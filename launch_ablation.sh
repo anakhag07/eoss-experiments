@@ -10,12 +10,12 @@
 #   ./launch_ablation.sh --preset all             # Run all presets
 #   ./launch_ablation.sh --custom --models "mlp cnn" --optimizers "sgd adam" \
 #     --lrs "0.001 0.005" --batches "8 32" --run   # Custom grid
-#   ./launch_ablation.sh --custom --optional-flags "--train-input-x-outliers 20 --train-input-y-outliers 5"
+#   ./launch_ablation.sh --custom --optional-flags "--cpu --disable-wandb"
 #   ./launch_ablation.sh --project-name my-project --run
 #   ./launch_ablation.sh --preset sgd --config-path configs/your_base.json --run
 #
 # NEW (schedule):
-#   --lmax-schedule "none decay drop"
+#   --lmax-schedule "none drop"
 #   --lmax-drop-mults "0.5 0.8"
 # =============================================================================
 
@@ -30,7 +30,6 @@ MODELS=""
 OPTIMIZERS=""
 LRS=""
 BATCHES=""
-LMAX_DECAYS=""
 LMAX_SCHEDULES=""
 LMAX_DROP_MULTS=""
 NUM_DATA=""
@@ -43,11 +42,11 @@ PROJECT_NAME=""
 CONFIG_PATH=""
 OPTIONAL_FLAGS=""
 INPUT_PROTOTYPES_MODES=""
-TRAIN_INPUT_PROTOTYPES_LIST=""
-HOLDOUT_BOUNDARY_COUNTS=""
-HOLDOUT_INLIERS_COUNTS=""
-HOLDOUT_X_OUTLIER_COUNTS=""
-HOLDOUT_Y_OUTLIER_COUNTS=""
+INPUT_PROTOTYPE_SOURCES=""
+INPUT_BOUNDARY_COUNTS=""
+INPUT_INLIERS_COUNTS=""
+INPUT_X_OUTLIER_COUNTS=""
+INPUT_Y_OUTLIER_COUNTS=""
 
 # Parse arguments
 while [[ $# -gt 0 ]]; do
@@ -79,10 +78,6 @@ while [[ $# -gt 0 ]]; do
       ;;
     --batches)
       BATCHES="$2"
-      shift 2
-      ;;
-    --lmax-decay)
-      LMAX_DECAYS="$2"
       shift 2
       ;;
     --lmax-schedule)
@@ -137,30 +132,30 @@ while [[ $# -gt 0 ]]; do
       INPUT_PROTOTYPES_MODES="$2"
       shift 2
       ;;
-    --train-input-prototypes)
-      TRAIN_INPUT_PROTOTYPES_LIST="$2"
+    --input-prototype-sources)
+      INPUT_PROTOTYPE_SOURCES="$2"
       shift 2
       ;;
-    --holdout-boundary-counts)
-      HOLDOUT_BOUNDARY_COUNTS="$2"
+    --input-boundary-counts)
+      INPUT_BOUNDARY_COUNTS="$2"
       shift 2
       ;;
-    --holdout-inliers-counts)
-      HOLDOUT_INLIERS_COUNTS="$2"
+    --input-inliers-counts)
+      INPUT_INLIERS_COUNTS="$2"
       shift 2
       ;;
-    --holdout-x-outlier-counts)
-      HOLDOUT_X_OUTLIER_COUNTS="$2"
+    --input-x-outlier-counts)
+      INPUT_X_OUTLIER_COUNTS="$2"
       shift 2
       ;;
-    --holdout-y-outlier-counts)
-      HOLDOUT_Y_OUTLIER_COUNTS="$2"
+    --input-y-outlier-counts)
+      INPUT_Y_OUTLIER_COUNTS="$2"
       shift 2
       ;;
     *)
       echo "Unknown argument: $1"
       echo "Usage: $0 [--run] [--preset fullgd|sgd|adam|momentum|all]"
-      echo "       $0 --custom --models \"...\" --optimizers \"...\" --lrs \"...\" [--batches \"...\"] [--lmax-decay \"...\"]"
+      echo "       $0 --custom --models \"...\" --optimizers \"...\" --lrs \"...\" [--batches \"...\"] [--lmax-schedule \"...\"]"
       exit 1
       ;;
   esac
@@ -177,7 +172,7 @@ submit_job() {
   local OPTIMIZER=$2
   local LR=$3
   local BATCH=$4
-  local LMAX_DECAY=${5:-0}
+  local LMAX_SCHEDULE=${5:-none}
   local EXTRA_EXPORTS=${6:-}
   
   local PROTO=""
@@ -186,11 +181,11 @@ submit_job() {
   fi
   local JOB_NAME="${MODEL}-${OPTIMIZER}-lr${LR}"
   
-  if [[ "$LMAX_DECAY" == "1" ]]; then
-    JOB_NAME="${JOB_NAME}-decay"
+  if [[ "$LMAX_SCHEDULE" == "drop" ]]; then
+    JOB_NAME="${JOB_NAME}-drop"
   fi
-  
-  local EXPORT_VARS="MODEL=${MODEL},OPTIMIZER=${OPTIMIZER},LR=${LR},BATCH=${BATCH},LMAX_DECAY=${LMAX_DECAY}"
+
+  local EXPORT_VARS="MODEL=${MODEL},OPTIMIZER=${OPTIMIZER},LR=${LR},BATCH=${BATCH},LMAX_SCHEDULE=${LMAX_SCHEDULE}"
   if [[ -n "$EXTRA_EXPORTS" ]]; then
     EXPORT_VARS="${EXPORT_VARS},${EXTRA_EXPORTS}"
   fi
@@ -220,11 +215,11 @@ submit_job() {
 # =============================================================================
 
 run_fullgd_preset() {
-  echo "=== Full-GD Preset: models × LRs × decay ==="
+  echo "=== Full-GD Preset: models × LRs × schedule ==="
   for MODEL in mlp cnn resnet; do
     for LR in 0.001 0.005 0.01; do
-      for LMAX_DECAY in 0 1; do
-        submit_job "$MODEL" "fullgd" "$LR" "10000" "$LMAX_DECAY"
+      for LMAX_SCHEDULE in none drop; do
+        submit_job "$MODEL" "fullgd" "$LR" "10000" "$LMAX_SCHEDULE"
       done
     done
   done
@@ -267,29 +262,39 @@ run_custom_grid() {
   local MODELS_LIST="${MODELS:-mlp}"
   local OPTIMIZERS_LIST="${OPTIMIZERS:-sgd}"
   local LRS_LIST="${LRS:-0.01}"
-  local LMAX_DECAYS_LIST="${LMAX_DECAYS:-0}"
   local SCHEDULES_LIST=""
   local DROP_MULTS_LIST="${LMAX_DROP_MULTS:-0.5}"
   local NUM_DATA_VAL="${NUM_DATA:-10000}"
   local LOSS_LIST="${LOSS:-ce}"
   local INPUT_PROTOTYPES_MODES_LIST="${INPUT_PROTOTYPES_MODES:-train}"
-  local TRAIN_INPUT_PROTOTYPES_VALUES="${TRAIN_INPUT_PROTOTYPES_LIST:-generate}"
-  local HOLDOUT_BOUNDARY_COUNTS_LIST="${HOLDOUT_BOUNDARY_COUNTS:-10}"
-  local HOLDOUT_INLIERS_COUNTS_LIST="${HOLDOUT_INLIERS_COUNTS:-10}"
-  local HOLDOUT_X_OUTLIER_COUNTS_LIST="${HOLDOUT_X_OUTLIER_COUNTS:-__UNSET__}"
-  local HOLDOUT_Y_OUTLIER_COUNTS_LIST="${HOLDOUT_Y_OUTLIER_COUNTS:-__UNSET__}"
+  local INPUT_PROTOTYPE_SOURCES_LIST="$INPUT_PROTOTYPE_SOURCES"
+  local INPUT_BOUNDARY_COUNTS_LIST="${INPUT_BOUNDARY_COUNTS:-__UNSET__}"
+  local INPUT_INLIERS_COUNTS_LIST="${INPUT_INLIERS_COUNTS:-__UNSET__}"
+  local INPUT_X_OUTLIER_COUNTS_LIST="${INPUT_X_OUTLIER_COUNTS:-__UNSET__}"
+  local INPUT_Y_OUTLIER_COUNTS_LIST="${INPUT_Y_OUTLIER_COUNTS:-__UNSET__}"
+  local HAS_PROTO_COUNT_GRID=0
+
+  if [[ -n "$INPUT_BOUNDARY_COUNTS" || -n "$INPUT_INLIERS_COUNTS" || -n "$INPUT_X_OUTLIER_COUNTS" || -n "$INPUT_Y_OUTLIER_COUNTS" ]]; then
+    HAS_PROTO_COUNT_GRID=1
+  fi
+  if [[ -z "$INPUT_PROTOTYPE_SOURCES_LIST" ]]; then
+    if [[ "$HAS_PROTO_COUNT_GRID" == "1" ]]; then
+      INPUT_PROTOTYPE_SOURCES_LIST="generate"
+    else
+      INPUT_PROTOTYPE_SOURCES_LIST="none"
+    fi
+  fi
+  if [[ "$HAS_PROTO_COUNT_GRID" == "0" ]]; then
+    for INPUT_PROTOTYPE_SOURCE_VAL in $INPUT_PROTOTYPE_SOURCES_LIST; do
+      if [[ "$INPUT_PROTOTYPE_SOURCE_VAL" != "none" ]]; then
+        echo "Input prototype sources '${INPUT_PROTOTYPE_SOURCES_LIST}' require at least one of --input-boundary-counts, --input-inliers-counts, --input-x-outlier-counts, or --input-y-outlier-counts."
+        exit 1
+      fi
+    done
+  fi
 
   if [[ -n "$LMAX_SCHEDULES" ]]; then
     SCHEDULES_LIST="$LMAX_SCHEDULES"
-  elif [[ -n "$LMAX_DECAYS" ]]; then
-    SCHEDULES_LIST=""
-    for d in $LMAX_DECAYS; do
-      if [[ "$d" == "1" ]]; then
-        SCHEDULES_LIST="${SCHEDULES_LIST} drop"
-      else
-        SCHEDULES_LIST="${SCHEDULES_LIST} none"
-      fi
-    done
   else
     SCHEDULES_LIST="none"
   fi
@@ -308,9 +313,9 @@ run_custom_grid() {
       for LR in $LRS_LIST; do
         for BATCH in $BATCHES_LIST; do
           for SCHEDULE in $SCHEDULES_LIST; do
-            local DECAY_VALUE="0"
-            if [[ "$SCHEDULE" == "decay" || "$SCHEDULE" == "drop" ]]; then
-              DECAY_VALUE="1"
+            if [[ "$SCHEDULE" != "none" && "$SCHEDULE" != "drop" ]]; then
+              echo "Unsupported --lmax-schedule value: $SCHEDULE"
+              exit 1
             fi
             local DROP_MULTS_FOR_SCHEDULE="1"
             if [[ "$SCHEDULE" == "drop" ]]; then
@@ -339,28 +344,42 @@ run_custom_grid() {
                 fi
 
                 for INPUT_PROTOTYPES_MODE_VAL in $INPUT_PROTOTYPES_MODES_LIST; do
-                  for TRAIN_INPUT_PROTOTYPES_VAL in $TRAIN_INPUT_PROTOTYPES_VALUES; do
-                    local PROTO_EXPORTS="${BASE_EXPORTS},INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE_VAL},TRAIN_INPUT_PROTOTYPES=${TRAIN_INPUT_PROTOTYPES_VAL}"
-                    if [[ "$INPUT_PROTOTYPES_MODE_VAL" == "val" ]]; then
-                      for HOLDOUT_BOUNDARY_COUNT_VAL in $HOLDOUT_BOUNDARY_COUNTS_LIST; do
-                        for HOLDOUT_INLIERS_COUNT_VAL in $HOLDOUT_INLIERS_COUNTS_LIST; do
-                          for HOLDOUT_X_OUTLIER_COUNT_VAL in $HOLDOUT_X_OUTLIER_COUNTS_LIST; do
-                            for HOLDOUT_Y_OUTLIER_COUNT_VAL in $HOLDOUT_Y_OUTLIER_COUNTS_LIST; do
-                              local VAL_EXPORTS="${PROTO_EXPORTS},INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT=${HOLDOUT_BOUNDARY_COUNT_VAL},INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT=${HOLDOUT_INLIERS_COUNT_VAL}"
-                              if [[ "$HOLDOUT_X_OUTLIER_COUNT_VAL" != "__UNSET__" ]]; then
-                                VAL_EXPORTS="${VAL_EXPORTS},INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT=${HOLDOUT_X_OUTLIER_COUNT_VAL}"
-                              fi
-                              if [[ "$HOLDOUT_Y_OUTLIER_COUNT_VAL" != "__UNSET__" ]]; then
-                                VAL_EXPORTS="${VAL_EXPORTS},INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT=${HOLDOUT_Y_OUTLIER_COUNT_VAL}"
-                              fi
-                              submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$VAL_EXPORTS"
-                            done
+                  for INPUT_PROTOTYPE_SOURCE_VAL in $INPUT_PROTOTYPE_SOURCES_LIST; do
+                    local PROTO_EXPORTS="${BASE_EXPORTS},INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE_VAL},INPUT_PROTOTYPE_SOURCE=${INPUT_PROTOTYPE_SOURCE_VAL}"
+                    if [[ "$INPUT_PROTOTYPE_SOURCE_VAL" == "none" ]]; then
+                      submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$SCHEDULE" "$PROTO_EXPORTS"
+                      continue
+                    fi
+
+                    for INPUT_BOUNDARY_COUNT_VAL in $INPUT_BOUNDARY_COUNTS_LIST; do
+                      for INPUT_INLIERS_COUNT_VAL in $INPUT_INLIERS_COUNTS_LIST; do
+                        for INPUT_X_OUTLIER_COUNT_VAL in $INPUT_X_OUTLIER_COUNTS_LIST; do
+                          for INPUT_Y_OUTLIER_COUNT_VAL in $INPUT_Y_OUTLIER_COUNTS_LIST; do
+                            local COUNT_EXPORTS="$PROTO_EXPORTS"
+                            local HAS_COUNT=0
+                            if [[ "$INPUT_BOUNDARY_COUNT_VAL" != "__UNSET__" ]]; then
+                              COUNT_EXPORTS="${COUNT_EXPORTS},INPUT_BOUNDARY=${INPUT_BOUNDARY_COUNT_VAL}"
+                              HAS_COUNT=1
+                            fi
+                            if [[ "$INPUT_INLIERS_COUNT_VAL" != "__UNSET__" ]]; then
+                              COUNT_EXPORTS="${COUNT_EXPORTS},INPUT_INLIERS=${INPUT_INLIERS_COUNT_VAL}"
+                              HAS_COUNT=1
+                            fi
+                            if [[ "$INPUT_X_OUTLIER_COUNT_VAL" != "__UNSET__" ]]; then
+                              COUNT_EXPORTS="${COUNT_EXPORTS},INPUT_X_OUTLIERS=${INPUT_X_OUTLIER_COUNT_VAL}"
+                              HAS_COUNT=1
+                            fi
+                            if [[ "$INPUT_Y_OUTLIER_COUNT_VAL" != "__UNSET__" ]]; then
+                              COUNT_EXPORTS="${COUNT_EXPORTS},INPUT_Y_OUTLIERS=${INPUT_Y_OUTLIER_COUNT_VAL}"
+                              HAS_COUNT=1
+                            fi
+                            if [[ "$HAS_COUNT" == "1" ]]; then
+                              submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$SCHEDULE" "$COUNT_EXPORTS"
+                            fi
                           done
                         done
                       done
-                    else
-                      submit_job "$MODEL" "$OPTIMIZER" "$LR" "$BATCH" "$DECAY_VALUE" "$PROTO_EXPORTS"
-                    fi
+                    done
                   done
                 done
               done

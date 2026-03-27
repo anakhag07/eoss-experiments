@@ -30,22 +30,18 @@ BATCH=${BATCH:-128}
 NUM_DATA=${NUM_DATA:-10000}
 INIT_SCALE=${INIT_SCALE:-0.2}
 STEPS=${STEPS:-}                   # Auto-calculated if empty
-LMAX_SCHEDULE=${LMAX_SCHEDULE:-""} # none | decay | drop (empty => infer from LMAX_DECAY)
-LMAX_DECAY=${LMAX_DECAY:-0}
+LMAX_SCHEDULE=${LMAX_SCHEDULE:-"none"} # none | drop
 LMAX_DROP_MULT=${LMAX_DROP_MULT:-0.5}
 LMAX_DROP_TARGET_LR=${LMAX_DROP_TARGET_LR:-""}
 CLASSES=${CLASSES:-"1 9"}
 TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
 PROJECT_NAME=${PROJECT_NAME:-""}
 INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE:-"train"}  # train | val
-TRAIN_INPUT_PROTOTYPES=${TRAIN_INPUT_PROTOTYPES:-"generate"}
-TEST_INPUT_PROTOTYPES=${TEST_INPUT_PROTOTYPES:-""}
-INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT=${INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT:-""}
-INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT=${INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT:-""}
-INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT=${INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT:-""}
-INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT=${INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT:-""}
-INPUT_PROTOTYPES_HOLDOUT_COUNT=${INPUT_PROTOTYPES_HOLDOUT_COUNT:-""}
-INPUT_PROTOTYPE_HOLDOUT_FRAC=${INPUT_PROTOTYPE_HOLDOUT_FRAC:-""}
+INPUT_PROTOTYPE_SOURCE=${INPUT_PROTOTYPE_SOURCE:-""}
+INPUT_BOUNDARY=${INPUT_BOUNDARY:-""}
+INPUT_INLIERS=${INPUT_INLIERS:-""}
+INPUT_X_OUTLIERS=${INPUT_X_OUTLIERS:-""}
+INPUT_Y_OUTLIERS=${INPUT_Y_OUTLIERS:-""}
 CONFIG_PATH=${CONFIG_PATH:-configs/your_base.json}
 REPO_ROOT=${REPO_ROOT:-/home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization}
 SKIP_ENV_SETUP=${SKIP_ENV_SETUP:-0}
@@ -73,7 +69,7 @@ fi
 echo "=============================================="
 echo "MODEL=${MODEL}, OPTIMIZER=${OPTIMIZER}, DATASET=${DATASET}"
 echo "LR=${LR}, BATCH=${BATCH}, NUM_DATA=${NUM_DATA}, STEPS=${STEPS}"
-echo "LMAX_SCHEDULE=${LMAX_SCHEDULE}, LMAX_DECAY=${LMAX_DECAY}, CLASSES=${CLASSES}"
+echo "LMAX_SCHEDULE=${LMAX_SCHEDULE}, CLASSES=${CLASSES}"
 echo "CONFIG_PATH=${CONFIG_PATH}"
 echo "=============================================="
 
@@ -130,29 +126,20 @@ append_split_args() {
   fi
 }
 
-# Lmax schedule selection (default to drop if LMAX_DECAY=1 and schedule unset)
-EFFECTIVE_LMAX_SCHEDULE="$LMAX_SCHEDULE"
-if [[ -z "$EFFECTIVE_LMAX_SCHEDULE" ]]; then
-  if [[ "$LMAX_DECAY" == "1" ]]; then
-    EFFECTIVE_LMAX_SCHEDULE="drop"
-  else
-    EFFECTIVE_LMAX_SCHEDULE="none"
-  fi
-fi
-
 # Batch sharpness: skip for full-GD (times out on large batches)
 if [[ "$OPTIMIZER" != "fullgd" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --batch-sharpness"
 fi
 
 # LR schedule triggered by λ_max
-if [[ "$EFFECTIVE_LMAX_SCHEDULE" == "decay" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lmax-decay --lmax-decay-target-lr 0.000001"
-elif [[ "$EFFECTIVE_LMAX_SCHEDULE" == "drop" ]]; then
+if [[ "$LMAX_SCHEDULE" == "drop" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lmax-drop --lmax-drop-mult ${LMAX_DROP_MULT}"
   if [[ -n "$LMAX_DROP_TARGET_LR" ]]; then
     OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lmax-drop-target-lr ${LMAX_DROP_TARGET_LR}"
   fi
+elif [[ "$LMAX_SCHEDULE" != "none" ]]; then
+  echo "Unsupported LMAX_SCHEDULE: $LMAX_SCHEDULE (expected 'none' or 'drop')"
+  exit 1
 fi
 
 # Feature prototype tracking
@@ -160,36 +147,24 @@ if [[ -n "$TRACK_FEATURE_PROTOTYPES_FROM" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --track-feature-prototypes-from $TRACK_FEATURE_PROTOTYPES_FROM"
 fi
 
-# Unified input-prototype mode (train/val)
+# Input-space prototype configuration
 if [[ -n "$INPUT_PROTOTYPES_MODE" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-mode $INPUT_PROTOTYPES_MODE"
 fi
-if [[ -n "$TRAIN_INPUT_PROTOTYPES" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --train-input-prototypes $TRAIN_INPUT_PROTOTYPES"
+if [[ -n "$INPUT_PROTOTYPE_SOURCE" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototype-source $INPUT_PROTOTYPE_SOURCE"
 fi
-if [[ -n "$TEST_INPUT_PROTOTYPES" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --test-input-prototypes $TEST_INPUT_PROTOTYPES"
+if [[ -n "$INPUT_BOUNDARY" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-boundary $INPUT_BOUNDARY"
 fi
-
-# New holdout overrides
-if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-boundary-count $INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT"
+if [[ -n "$INPUT_INLIERS" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-inliers $INPUT_INLIERS"
 fi
-if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-inliers-count $INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT"
+if [[ -n "$INPUT_X_OUTLIERS" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-x-outliers $INPUT_X_OUTLIERS"
 fi
-if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-x-outlier-count $INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT"
-fi
-if [[ -n "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-y-outlier-count $INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT"
-fi
-
-# Backward-compatible legacy holdout settings (only if new overrides are unset)
-if [[ -z "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]] && [[ -n "$INPUT_PROTOTYPES_HOLDOUT_COUNT" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-holdout-boundary-count $INPUT_PROTOTYPES_HOLDOUT_COUNT --input-prototypes-holdout-inliers-count $INPUT_PROTOTYPES_HOLDOUT_COUNT"
-elif [[ -z "$INPUT_PROTOTYPES_HOLDOUT_BOUNDARY_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_INLIERS_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_X_OUTLIER_COUNT" ]] && [[ -z "$INPUT_PROTOTYPES_HOLDOUT_Y_OUTLIER_COUNT" ]] && [[ -n "$INPUT_PROTOTYPE_HOLDOUT_FRAC" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototype-holdout-frac $INPUT_PROTOTYPE_HOLDOUT_FRAC"
+if [[ -n "$INPUT_Y_OUTLIERS" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-y-outliers $INPUT_Y_OUTLIERS"
 fi
 
 # ---------- Training command ----------
