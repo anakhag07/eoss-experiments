@@ -13,6 +13,32 @@
 
 ## Running Experiments
 
+### Autoresearch Workflow
+
+For LLM-driven experiment loops, the canonical execution surface is the launcher itself:
+
+```bash
+bash eoss_training_scripts/launch_ablation.sh --custom ...
+```
+
+Recommended operating pattern:
+
+1. Dry-run a focused grid first.
+2. Submit with `--run`.
+3. Poll Slurm and wait for queued jobs to finish.
+4. Inspect local W&B outputs in the project directory.
+5. Summarize runs into a flat table for comparison.
+
+Example summary command:
+
+```bash
+python eoss_training_scripts/summarize_wandb_runs.py \
+  --wandb-root /home/anakhag/projects/eos/<project-name> \
+  --output /home/anakhag/projects/eos/<project-name>/runs.csv
+```
+
+The summarizer derives stability-ratio columns when both `grad_hessian_grad` and `lambda_max` are present. For subset groups, it emits `<prefix>stability_ratio` columns from `<prefix>grad_hessian_grad / lambda_max`.
+
 ### Full-GD Grid (Primary)
 
 ```bash
