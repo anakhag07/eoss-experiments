@@ -24,7 +24,7 @@ set -e
 DRY_RUN=true
 PRESET="fullgd"
 CUSTOM=false
-USE_PROTOTYPES=true
+USE_PROTOTYPES=false
 
 MODELS=""
 OPTIMIZERS=""
@@ -161,12 +161,6 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
-# Prototype registry (model -> seed run ID)
-declare -A PROTOTYPES
-PROTOTYPES[mlp]="20260108_1246_57_lr0.01000_b8"
-PROTOTYPES[cnn]="20260115_1632_56_lr0.01000_b64"
-PROTOTYPES[resnet]="20260115_1547_45_lr0.01000_b128"
-
 submit_job() {
   local MODEL=$1
   local OPTIMIZER=$2
@@ -174,11 +168,6 @@ submit_job() {
   local BATCH=$4
   local LMAX_SCHEDULE=${5:-none}
   local EXTRA_EXPORTS=${6:-}
-  
-  local PROTO=""
-  if $USE_PROTOTYPES; then
-    PROTO="${PROTOTYPES[$MODEL]}"
-  fi
   local JOB_NAME="${MODEL}-${OPTIMIZER}-lr${LR}"
   
   if [[ "$LMAX_SCHEDULE" == "drop" ]]; then
@@ -197,9 +186,6 @@ submit_job() {
   fi
   if [[ -n "$INIT_SCALE" ]]; then
     EXPORT_VARS="${EXPORT_VARS},INIT_SCALE=${INIT_SCALE}"
-  fi
-  if [[ -n "$PROTO" ]]; then
-    EXPORT_VARS="${EXPORT_VARS},TRACK_FEATURE_PROTOTYPES_FROM=${PROTO}"
   fi
   
   if $DRY_RUN; then

@@ -103,6 +103,61 @@ Use the launcher's modern input-prototype knobs to sweep mode, source, and per-c
 
 Counts are only emitted when provided. Use `--input-prototype-sources "none"` for a no-prototype baseline, or `generate` / `from:<path-or-run>` together with one or more of `--input-boundary-counts`, `--input-inliers-counts`, `--input-x-outlier-counts`, and `--input-y-outlier-counts`.
 
+### Fork Descendants
+
+Use the regular launcher for fresh baseline runs, then launch exact continuation descendants from explicit run IDs and continuation steps.
+
+Baseline example for `cifar10_2cls`, `mse`, full GD, and current input-prototype flags:
+
+```bash
+./launch_ablation.sh --custom \
+  --models "mlp" \
+  --optimizers "fullgd" \
+  --lrs "0.01" \
+  --dataset "cifar10_2cls" \
+  --loss "mse" \
+  --classes "1 9" \
+  --num-data 10000 \
+  --config-path configs/your_base.json \
+  --optional-flags "--checkpoint-every 500" \
+  --input-prototypes-modes "train" \
+  --input-prototype-sources "from:$PROTO" \
+  --input-boundary-counts "25" \
+  --input-inliers-counts "25" \
+  --input-x-outlier-counts "25" \
+  --input-y-outlier-counts "25" \
+  --project-name "eoss-fork-baselines" \
+  --run
+```
+
+After collecting baseline run IDs and their `t_star` steps, submit descendants with scheduled drops:
+
+```bash
+./launch_fork_ablation.sh \
+  --baseline-run-ids "abc123xyz" \
+  --cont-steps "42000" \
+  --base-lrs "0.01" \
+  --drop-mults "0.8 0.5 0.2" \
+  --dataset "cifar10_2cls" \
+  --loss "mse" \
+  --optimizer "fullgd" \
+  --model "mlp" \
+  --classes "1 9" \
+  --num-data 10000 \
+  --config-path configs/your_base.json \
+  --checkpoint-every 500 \
+  --input-prototypes-mode train \
+  --input-prototype-source "from:$PROTO" \
+  --input-boundary 25 \
+  --input-inliers 25 \
+  --input-x-outliers 25 \
+  --input-y-outliers 25 \
+  --project-name "eoss-fork-descendants" \
+  --run
+```
+
+The descendant launcher computes `LR_DROP_TO = base_lr * drop_mult` and emits `CONT_RUN_ID`, `CONT_STEP`, `LR_DROP_AT_STEP`, and `LR_DROP_TO` into `train_eoss.slurm`.
+
 ### Schedule Control
 
 ```bash
@@ -164,6 +219,7 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 5. **Adam sharpness metric**: `train_eoss.slurm` always adds `--precond-lmax` when `OPTIMIZER=adam`
 6. **Base config precedence**: `CONFIG_PATH` supplies defaults, but exported env vars still win because they are emitted as CLI overrides
 7. **Input prototype launcher interface**: use `INPUT_PROTOTYPE_SOURCE` plus per-subset counts; legacy launcher flags are removed
+8. **Fork descendants are a second phase**: collect baseline `run_id` and `t_star` first, then use `launch_fork_ablation.sh`
 
 ---
 
@@ -173,5 +229,6 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 |------|---------|
 | `train_eoss.slurm` | Unified template (handles all optimizers) |
 | `launch_ablation.sh` | Grid launcher with `--preset` and `--dry-run` |
+| `launch_fork_ablation.sh` | Explicit-list launcher for continuation descendants |
 | `prototype_registry.json` | Seed run IDs for feature tracking |
 | `train_eoss_*.slurm` | Legacy per-optimizer scripts (still work) |

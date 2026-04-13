@@ -34,14 +34,20 @@ LMAX_SCHEDULE=${LMAX_SCHEDULE:-"none"} # none | drop
 LMAX_DROP_MULT=${LMAX_DROP_MULT:-0.5}
 LMAX_DROP_TARGET_LR=${LMAX_DROP_TARGET_LR:-""}
 CLASSES=${CLASSES:-"1 9"}
-TRACK_FEATURE_PROTOTYPES_FROM=${TRACK_FEATURE_PROTOTYPES_FROM:-""}
 PROJECT_NAME=${PROJECT_NAME:-""}
+WANDB_TAG=${WANDB_TAG:-""}
+WANDB_NAME=${WANDB_NAME:-""}
 INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE:-"train"}  # train | val
 INPUT_PROTOTYPE_SOURCE=${INPUT_PROTOTYPE_SOURCE:-""}
 INPUT_BOUNDARY=${INPUT_BOUNDARY:-""}
 INPUT_INLIERS=${INPUT_INLIERS:-""}
 INPUT_X_OUTLIERS=${INPUT_X_OUTLIERS:-""}
 INPUT_Y_OUTLIERS=${INPUT_Y_OUTLIERS:-""}
+CONT_RUN_ID=${CONT_RUN_ID:-""}
+CONT_STEP=${CONT_STEP:-""}
+LR_DROP_AT_STEP=${LR_DROP_AT_STEP:-""}
+LR_DROP_TO=${LR_DROP_TO:-""}
+CHECKPOINT_EVERY=${CHECKPOINT_EVERY:-""}
 CONFIG_PATH=${CONFIG_PATH:-configs/your_base.json}
 REPO_ROOT=${REPO_ROOT:-/home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization}
 SKIP_ENV_SETUP=${SKIP_ENV_SETUP:-0}
@@ -72,6 +78,16 @@ echo "LR=${LR}, BATCH=${BATCH}, NUM_DATA=${NUM_DATA}, STEPS=${STEPS}"
 echo "LMAX_SCHEDULE=${LMAX_SCHEDULE}, CLASSES=${CLASSES}"
 echo "CONFIG_PATH=${CONFIG_PATH}"
 echo "=============================================="
+
+if [[ -n "$CONT_RUN_ID" && -z "$CONT_STEP" ]] || [[ -z "$CONT_RUN_ID" && -n "$CONT_STEP" ]]; then
+  echo "CONT_RUN_ID and CONT_STEP must be provided together"
+  exit 1
+fi
+
+if [[ -n "$LR_DROP_AT_STEP" && -z "$LR_DROP_TO" ]] || [[ -z "$LR_DROP_AT_STEP" && -n "$LR_DROP_TO" ]]; then
+  echo "LR_DROP_AT_STEP and LR_DROP_TO must be provided together"
+  exit 1
+fi
 
 # ---------- Environment setup ----------
 if [[ "$SKIP_ENV_SETUP" != "1" ]]; then
@@ -142,11 +158,6 @@ elif [[ "$LMAX_SCHEDULE" != "none" ]]; then
   exit 1
 fi
 
-# Feature prototype tracking
-if [[ -n "$TRACK_FEATURE_PROTOTYPES_FROM" ]]; then
-  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --track-feature-prototypes-from $TRACK_FEATURE_PROTOTYPES_FROM"
-fi
-
 # Input-space prototype configuration
 if [[ -n "$INPUT_PROTOTYPES_MODE" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-prototypes-mode $INPUT_PROTOTYPES_MODE"
@@ -165,6 +176,21 @@ if [[ -n "$INPUT_X_OUTLIERS" ]]; then
 fi
 if [[ -n "$INPUT_Y_OUTLIERS" ]]; then
   OPTIONAL_FLAGS="$OPTIONAL_FLAGS --input-y-outliers $INPUT_Y_OUTLIERS"
+fi
+if [[ -n "$CONT_RUN_ID" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --cont-run-id $CONT_RUN_ID --cont-step $CONT_STEP"
+fi
+if [[ -n "$LR_DROP_AT_STEP" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --lr-drop-at-step $LR_DROP_AT_STEP --lr-drop-to $LR_DROP_TO"
+fi
+if [[ -n "$CHECKPOINT_EVERY" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --checkpoint-every $CHECKPOINT_EVERY"
+fi
+if [[ -n "$WANDB_TAG" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --wandb-tag $WANDB_TAG"
+fi
+if [[ -n "$WANDB_NAME" ]]; then
+  OPTIONAL_FLAGS="$OPTIONAL_FLAGS --wandb-name $WANDB_NAME"
 fi
 
 # ---------- Training command ----------
