@@ -1,5 +1,5 @@
 {
-  "description": "Seed run IDs for feature prototype tracking. These runs must complete successfully before using --track-feature-prototypes-from.",
+  "description": "Seed run IDs for input prototype tracking. These runs must complete successfully before using --track-feature-prototypes-from.",
   "cifar10": {
     "mlp": {
       "run_id": "20260108_1246_57_lr0.01000_b8",

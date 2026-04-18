@@ -45,7 +45,7 @@ from eos_signals import primitives  # noqa: E402
 
 
 CORE_METRICS = ["full_loss", "lambda_max"]
-GROUP_METRIC_SUFFIXES = ["full_loss", "lambda_max", "grad_hessian_grad", "grad_norm"]
+GROUP_METRIC_SUFFIXES = ["full_loss", "lambda_max", "grad_hessian_grad", "grad_norm", "grad_vmax_cos2"]
 HPARAM_KEYS = [
     "lr", "learning_rate", "optimizer", "batch_size", "model", "dataset",
     "lmax_schedule", "lmax_drop_mult", "input_prototypes_mode",
@@ -155,7 +155,7 @@ def _run_group_signals(
             )
             for stat in ("median", "mean", "max", "min", "last", "n"):
                 out[f"{prefix}.stability_ratio.{stat}"] = s.get(stat)
-        # Per-group full_loss final + slope in second half.
+        # Per-group full_loss final + slope in second half + first decline onset.
         if "full_loss" in cols:
             clean = df[[step_col, cols["full_loss"]]].apply(pd.to_numeric, errors="coerce").dropna()
             if not clean.empty:
@@ -166,6 +166,27 @@ def _run_group_signals(
                 sl = primitives.slope_in_window(df, step_col, cols["full_loss"], mid, smax)
                 out[f"{prefix}.slope.full_loss.slope"] = sl["slope"]
                 out[f"{prefix}.slope.full_loss.n"] = sl["n"]
+                onset = primitives.first_window_with_negative_slope(
+                    df, step_col, cols["full_loss"],
+                    window=10, slope_threshold=0.0, min_r2=0.5, start_step=start_step,
+                )
+                out[f"{prefix}.loss_decline_onset.full_loss.step"] = onset["step"]
+                out[f"{prefix}.loss_decline_onset.full_loss.slope"] = onset["slope"]
+                out[f"{prefix}.loss_decline_onset.full_loss.r2"] = onset["r2"]
+        # Per-group grad_vmax_cos2 first crossing (tests H03 leading indicator).
+        if "grad_vmax_cos2" in cols:
+            col = cols["grad_vmax_cos2"]
+            clean = df[[step_col, col]].apply(pd.to_numeric, errors="coerce").dropna()
+            if not clean.empty:
+                # Threshold 0.1: 10% of total gradient energy aligned with v_1.
+                cr = primitives.crossing_step(
+                    df, step_col, col, threshold=0.1, direction="up", start_step=start_step,
+                )
+                out[f"{prefix}.cos_crossing.grad_vmax_cos2.step"] = cr["step"]
+                out[f"{prefix}.cos_crossing.grad_vmax_cos2.value_at_step"] = cr["value_at_step"]
+                out[f"{prefix}.cos_crossing.grad_vmax_cos2.threshold"] = cr["threshold"]
+                out[f"{prefix}.final.grad_vmax_cos2"] = float(clean[col].iloc[-1])
+                out[f"{prefix}.max.grad_vmax_cos2"] = float(clean[col].max())
 
     # Group separation across prototype groups.
     for metric_suffix in ("full_loss", "lambda_max"):
@@ -280,7 +301,7 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--entity", default=None, help="W&B entity/team if needed.")
     p.add_argument("--out-dir", type=Path, default=None,
                    help="Directory for digest.json / digest.csv / digest_plots/. "
-                        "Default: digests/<project>/<timestamp>/")
+                        "Default: research-tick-results/ticks/<timestamp>/digests/<project>/")
     p.add_argument("--samples", type=int, default=5000, help="History samples per run.")
     p.add_argument("--step-col", default="_step", help="Step column (default: _step).")
     p.add_argument("--start-step", type=float, default=100.0,
@@ -296,7 +317,7 @@ def main() -> int:
 
     if args.out_dir is None:
         ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-        args.out_dir = _REPO_ROOT / "digests" / args.project / ts
+        args.out_dir = _REPO_ROOT / "research-tick-results" / "ticks" / ts / "digests" / args.project
     args.out_dir.mkdir(parents=True, exist_ok=True)
     digest_plots = args.out_dir / "digest_plots"
     digest_plots.mkdir(parents=True, exist_ok=True)
