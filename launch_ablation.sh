@@ -21,6 +21,9 @@
 
 set -e
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SLURM_FILE="${SCRIPT_DIR}/train_eoss.slurm"
+
 DRY_RUN=true
 PRESET="fullgd"
 CUSTOM=false
@@ -189,10 +192,10 @@ submit_job() {
   fi
   
   if $DRY_RUN; then
-    echo "[DRY RUN] sbatch --job-name=${JOB_NAME} --export=${EXPORT_VARS} train_eoss.slurm"
+    echo "[DRY RUN] sbatch --job-name=${JOB_NAME} --export=${EXPORT_VARS} ${SLURM_FILE}"
   else
     echo "Submitting: ${JOB_NAME}"
-    sbatch --job-name="${JOB_NAME}" --export="${EXPORT_VARS}" train_eoss.slurm
+    sbatch --job-name="${JOB_NAME}" --export="${EXPORT_VARS}" "${SLURM_FILE}"
   fi
 }
 
