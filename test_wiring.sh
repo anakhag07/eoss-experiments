@@ -8,7 +8,8 @@ REPO_ROOT_DEFAULT=$(realpath "$SCRIPT_DIR/../edge-of-stochastic-stability-and-me
 ABLAT_OUT=$(mktemp)
 TRAIN_OUT=$(mktemp)
 FORK_OUT=$(mktemp)
-trap 'rm -f "$ABLAT_OUT" "$TRAIN_OUT" "$FORK_OUT"' EXIT
+DENSE_OUT=$(mktemp)
+trap 'rm -f "$ABLAT_OUT" "$TRAIN_OUT" "$FORK_OUT" "$DENSE_OUT"' EXIT
 
 bash "$SCRIPT_DIR/launch_ablation.sh" --preset sgd --config-path configs/your_base.json > "$ABLAT_OUT"
 grep -Eq -- '--export=.*CONFIG_PATH=configs/your_base.json' "$ABLAT_OUT"
@@ -45,6 +46,7 @@ INPUT_Y_OUTLIERS=2 \
 MODEL=mlp OPTIMIZER=adam LR=0.01 BATCH=64 NUM_DATA=10000 \
 bash "$SCRIPT_DIR/train_eoss.slurm" > "$TRAIN_OUT"
 
+grep -Eq -- 'WANDB_DIR=/home/anakhag/projects/eos/eoss-adam-mlp-ce-cifar10' "$TRAIN_OUT"
 grep -Eq -- '--config configs/your_base.json' "$TRAIN_OUT"
 grep -Eq -- '--adam --precond-lmax' "$TRAIN_OUT"
 grep -Eq -- '--batch-sharpness' "$TRAIN_OUT"
@@ -66,11 +68,51 @@ LR_DROP_AT_STEP=42000 LR_DROP_TO=0.005 \
 CHECKPOINT_EVERY=500 WANDB_TAG=fork-test WANDB_NAME=fork_desc \
 bash "$SCRIPT_DIR/train_eoss.slurm" > "$TRAIN_OUT"
 
+grep -Eq -- 'WANDB_DIR=/home/anakhag/projects/eos/eoss-fullgd-mlp-ce-cifar10' "$TRAIN_OUT"
 grep -Eq -- '--cont-run-id abc123 --cont-step 42000' "$TRAIN_OUT"
 grep -Eq -- '--lr-drop-at-step 42000 --lr-drop-to 0.005' "$TRAIN_OUT"
 grep -Eq -- '--checkpoint-every 500' "$TRAIN_OUT"
 grep -Eq -- '--wandb-tag fork-test' "$TRAIN_OUT"
 grep -Eq -- '--wandb-name fork_desc' "$TRAIN_OUT"
+
+CONFIG_PATH=/home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization/configs/your_base.json \
+REPO_ROOT="$REPO_ROOT_DEFAULT" \
+SKIP_ENV_SETUP=1 \
+PRINT_COMMAND_ONLY=1 \
+WANDB_PROJECT=dense-test \
+WANDB_DIR_BASE=/tmp/eoss-wandb \
+INIT_SCALE=0.01 \
+PROTO_PATH=/tmp/custom-proto \
+bash "$SCRIPT_DIR/fork_intervention_proto_dense.slurm" > "$DENSE_OUT"
+
+grep -Eq -- 'TRAINING_PY=.*/edge-of-stochastic-stability-and-memorization/training.py' "$DENSE_OUT"
+grep -Eq -- 'PROTO_PATH=/tmp/custom-proto' "$DENSE_OUT"
+grep -Eq -- 'INIT_SCALE=0.01' "$DENSE_OUT"
+grep -Eq -- 'Running: python -u .*/edge-of-stochastic-stability-and-memorization/training.py' "$DENSE_OUT"
+grep -Eq -- 'WANDB_DIR=/tmp/eoss-wandb/dense-test' "$DENSE_OUT"
+grep -Eq -- 'RESULTS=/tmp/eoss-wandb/dense-test' "$DENSE_OUT"
+
+CONFIG_PATH=/home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization/configs/your_base.json \
+REPO_ROOT="$REPO_ROOT_DEFAULT" \
+SKIP_ENV_SETUP=1 \
+PRINT_COMMAND_ONLY=1 \
+WANDB_PROJECT=dense-default \
+bash "$SCRIPT_DIR/fork_intervention_proto_dense.slurm" > "$DENSE_OUT"
+
+grep -Eq -- 'PROTO_PATH=/home/anakhag/projects/eos/eos_results/plaintext/cifar10_2cls_resnet/prototypes_package' "$DENSE_OUT"
+grep -Eq -- 'RESULTS=/home/anakhag/projects/eos/dense-default' "$DENSE_OUT"
+
+CONFIG_PATH=/home/anakhag/projects/eos/edge-of-stochastic-stability-and-memorization/configs/your_base.json \
+REPO_ROOT="$REPO_ROOT_DEFAULT" \
+SKIP_ENV_SETUP=1 \
+PRINT_COMMAND_ONLY=1 \
+WANDB_PROJECT=dense-results \
+RESULTS_DIR=/tmp/eoss-results \
+PROTO_PATH=/tmp/results-proto \
+bash "$SCRIPT_DIR/fork_intervention_proto_dense.slurm" > "$DENSE_OUT"
+
+grep -Eq -- 'WANDB_DIR=/tmp/eoss-results/wandb/dense-results' "$DENSE_OUT"
+grep -Eq -- 'RESULTS=/tmp/eoss-results/wandb/dense-results' "$DENSE_OUT"
 
 bash "$SCRIPT_DIR/launch_fork_ablation.sh" \
   --baseline-run-ids "abc123 def456" \
