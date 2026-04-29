@@ -37,6 +37,8 @@
 #   WANDB_PROJECT=custom-project
 #   RESULTS_DIR=/abs/path/to/results
 #   PROTO_PATH=/abs/path/to/input_prototypes  # overrides the default package path
+#   OPTIMIZER=fullgd|fullgdm|sgd|momentum|adam
+#   MOMENTUM=0.9  # used by OPTIMIZER=fullgdm
 #   SKIP_ENV_SETUP=1
 #   CONDA_ENV_NAME=eoss
 #   MODULE_TO_LOAD=miniforge/24.3.0-0
@@ -53,6 +55,7 @@ STEPS=${STEPS:-10000}
 MODEL=${MODEL:-mlp}
 LOSS=${LOSS:-mse}
 OPTIMIZER=${OPTIMIZER:-fullgd}
+MOMENTUM=${MOMENTUM:-0.9}
 DATASET=${DATASET:-cifar10_2cls}
 NUM_DATA=${NUM_DATA:-10000}
 INIT_SCALE=${INIT_SCALE:-0.01}
@@ -142,7 +145,7 @@ echo "WANDB_DIR=${WANDB_DIR}"
 echo "RESULTS=${RESULTS}"
 echo "PWD=$(pwd)"
 
-if [[ "$OPTIMIZER" == "fullgd" ]]; then
+if [[ "$OPTIMIZER" == "fullgd" || "$OPTIMIZER" == "fullgdm" ]]; then
   BATCH=${BATCH:-$NUM_DATA}
 else
   BATCH=${BATCH:-128}
@@ -177,6 +180,9 @@ case "$OPTIMIZER" in
     ;;
   momentum)
     CMD+=(--momentum 0.9 --batch-sharpness)
+    ;;
+  fullgdm)
+    CMD+=(--momentum "$MOMENTUM")
     ;;
   sgd)
     CMD+=(--batch-sharpness)
