@@ -28,7 +28,7 @@ LOSS=${LOSS:-ce}
 LR=${LR:-0.01}
 BATCH=${BATCH:-128}
 NUM_DATA=${NUM_DATA:-10000}
-INIT_SCALE=${INIT_SCALE:-0.2}
+INIT_SCALE=${INIT_SCALE:-0.01}
 STEPS=${STEPS:-}                   # Auto-calculated if empty
 LMAX_SCHEDULE=${LMAX_SCHEDULE:-"none"} # none | drop
 LMAX_DROP_MULT=${LMAX_DROP_MULT:-0.5}
@@ -37,6 +37,7 @@ CLASSES=${CLASSES:-"1 9"}
 PROJECT_NAME=${PROJECT_NAME:-""}
 WANDB_TAG=${WANDB_TAG:-""}
 WANDB_NAME=${WANDB_NAME:-""}
+WANDB_DIR_BASE=${WANDB_DIR_BASE:-/home/anakhag/projects/eos}
 INPUT_PROTOTYPES_MODE=${INPUT_PROTOTYPES_MODE:-"train"}  # train | val
 INPUT_PROTOTYPE_SOURCE=${INPUT_PROTOTYPE_SOURCE:-""}
 INPUT_BOUNDARY=${INPUT_BOUNDARY:-""}
@@ -105,10 +106,11 @@ fi
 if [[ -n "$PROJECT_NAME" ]]; then
   export WANDB_PROJECT="$PROJECT_NAME"
 else
-  export WANDB_PROJECT="eoss-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
+  export WANDB_PROJECT="fork-eoss-proto-dense-${OPTIMIZER}-${MODEL}-${LOSS}-${DATASET}"
 fi
-export WANDB_DIR="/home/anakhag/projects/eos/${WANDB_PROJECT}"
+export WANDB_DIR="${WANDB_DIR_BASE}/${WANDB_PROJECT}"
 mkdir -p "$WANDB_DIR"
+echo "WANDB_DIR=${WANDB_DIR}"
 
 # ---------- Build optimizer flags ----------
 OPTIMIZER_FLAGS=""
@@ -210,6 +212,8 @@ CMD=(python -u training.py
   --init-seed 8312
   --stop-loss 0.00001
   --lambdamax
+  --dense-window 0 $STEPS 32
+
 )
 if [[ ${#CLASSES_ARRAY[@]} -gt 0 ]]; then
   CMD+=(--classes "${CLASSES_ARRAY[@]}")

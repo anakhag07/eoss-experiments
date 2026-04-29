@@ -61,6 +61,22 @@ The summarizer derives stability-ratio columns when both `grad_hessian_grad` and
 sbatch --export=MODEL=cnn,OPTIMIZER=fullgd,LR=0.005,PROJECT_NAME=eoss-train-run,LMAX_SCHEDULE=drop train_eoss.slurm
 ```
 
+Directory convention:
+
+```bash
+# Default local W&B root
+WANDB_DIR_BASE=/home/anakhag/projects/eos
+
+# Final run directory
+WANDB_DIR=${WANDB_DIR_BASE}/${WANDB_PROJECT}
+```
+
+Override the storage root when needed:
+
+```bash
+sbatch --export=MODEL=cnn,OPTIMIZER=fullgd,LR=0.005,PROJECT_NAME=eoss-train-run,WANDB_DIR_BASE=/home/anakhag/projects/alt-wandb train_eoss.slurm
+```
+
 ### Config-First Job
 
 `train_eoss.slurm` now launches `training.py` with a base JSON config and then applies env-driven CLI overrides on top.
@@ -158,6 +174,8 @@ After collecting baseline run IDs and their `t_star` steps, submit descendants w
 
 The descendant launcher computes `LR_DROP_TO = base_lr * drop_mult` and emits `CONT_RUN_ID`, `CONT_STEP`, `LR_DROP_AT_STEP`, and `LR_DROP_TO` into `train_eoss.slurm`.
 
+Both `train_eoss.slurm` and `fork_intervention_proto_dense.slurm` now honor the same `WANDB_DIR_BASE` convention. If `WANDB_DIR_BASE` is unset in the dense script, an explicit `RESULTS_DIR` still maps to `${RESULTS_DIR}/wandb` for backward compatibility. The dense script also exports `RESULTS=${WANDB_DIR}`, so plaintext outputs land under the same resolved project directory, defaults `PROTO_PATH` to `/home/anakhag/projects/eos/eos_results/plaintext/cifar10_2cls_resnet/prototypes_package`, and only needs `PROTO_PATH=...` when you want a different package.
+
 ### Schedule Control
 
 ```bash
@@ -220,6 +238,7 @@ sbatch train_eoss_full_gd.slurm  # edit file, submit again...
 6. **Base config precedence**: `CONFIG_PATH` supplies defaults, but exported env vars still win because they are emitted as CLI overrides
 7. **Input prototype launcher interface**: use `INPUT_PROTOTYPE_SOURCE` plus per-subset counts; legacy launcher flags are removed
 8. **Fork descendants are a second phase**: collect baseline `run_id` and `t_star` first, then use `launch_fork_ablation.sh`
+9. **W&B storage root**: set `WANDB_DIR_BASE` to move local run storage without changing `PROJECT_NAME`
 
 ---
 
